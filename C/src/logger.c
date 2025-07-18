@@ -21,8 +21,3 @@ void close_logger(void){
     }
 }
 
-/// @brief Check if source and target folders exist upon user entry
-/// @param folder Path to the source / destination folder
-void handle_folder_logging(const char* folder){
-
-}
