@@ -3,11 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#ifdef _WIN32
-#include <Windows.h>
-#else
-#include <dirent.h>
-#endif
 
 int main(void){
     init_logger("Migration_log.log");
@@ -24,7 +19,8 @@ int main(void){
         close_logger();
         return 1;
     }
-   
+
+      
 
 
 }

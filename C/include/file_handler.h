@@ -2,7 +2,9 @@
 #define FILE_HANDLER
 
 #include <stddef.h>
+#include <stdbool.h>
 
-int get_valid_dir(const char* prompt, char* buffer, size_t size);
+int get_valid_directory(const char* prompt, char* buffer, size_t size);
+bool is_directory(const char* path);
 
 #endif

@@ -21,3 +21,6 @@ void close_logger(void){
     }
 }
 
+void log_message(LogLevel level, const char* format, ...){
+    
+}
