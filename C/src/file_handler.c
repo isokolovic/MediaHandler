@@ -7,7 +7,7 @@
 static const char* image_extensions[] = { ".jpg", ".jpeg", ".heic", ".png", ".bmp" };
 static const char* video_extensions[] = { ".mp4", ".avi", ".mov", ".3gp" };
 static const char* other_extensions[] = { ".gif", ".mp3" };
-static const char* special_chars = " %:/,\\{}~[]<>*?čćžđšČĆŽŠĐ";
+static const char* special_chars = " %:/,.\\{}~[]<>*?čćžđšČĆŽŠĐ";
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -47,28 +47,62 @@ bool create_folder(const char* path)
     return false;
 }
 
+/// @brief Clean file / folder name of any special characters
+/// @param element Element to be cleaned
+/// @return Cleaned name, NULL if error, "Unnamed" strlen(cleaned_element) == 0
+char* clean_name(const char* element)
+{
+    size_t length = strlen(element); 
+    char* cleaned_name = malloc(length + 1); 
+    if (!cleaned_name) {
+        log_message(LOG_ERROR, "Memory allocation failed for clean_name");
+        return NULL;
+    }
+
+    //Clean of special characters
+    size_t j = 0; 
+    for (size_t i = 0; i < length; i++) {
+        char ch = element[i]; 
+        if (!strchr(special_chars, ch)) {
+            cleaned_name[j++] = ch;
+        }
+    }
+    cleaned_name[j] = '\0'; 
+
+    if (strlen(cleaned_name) == 0) {
+        free(cleaned_name); 
+        cleaned_name = strdump("Unnamed"); 
+        if (!cleaned_name) {
+            log_message(LOG_ERROR, "Memory allocation failed for clean_name");
+            return NULL;
+        }
+    }
+    return cleaned_name;
+}
+
 /// @brief Check if source / destination folders are found upon user entry
 /// @param folder Path to the source / destination folder
-int get_valid_directory(const char* prompt, char* folder, size_t size){    
+int get_valid_directory(const char* prompt, char* folder, size_t size) {
     //Prompt for a folder
     printf(prompt);
-    if(fgets(folder, size, stdin) == NULL){
+    if (fgets(folder, size, stdin) == NULL) {
         log_message(LOG_ERROR, "Failed to read the source folder path. ");
         close_logger();
-        return 1;        
+        return 1;
     }
 
     //Set value of first newline character to '\0' (remove newline)
-    folder[strcspn(folder, "\n")] = 0; 
+    folder[strcspn(folder, "\n")] = 0;
 
     //Validate the source folder
-    if(!is_directory(folder)){
+    if (!is_directory(folder)) {
         log_message(LOG_ERROR, "Source folder %s does not exist", folder);
-        close_logger(); 
+        close_logger();
         return 1;
     }
 
     return 0;
+}
 
 
 /// @brief Check if file needs to be processed

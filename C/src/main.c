@@ -44,7 +44,7 @@ void run_media_migration(const char* source_folder, const char* destination_fold
             run_media_migration(full_path, destination_folder);
         } else if (is_file_type_valid(find_data.cFileName)){
             log_message(LOG_INFO, "Processing file: %s", find_data.cFileName);
-            create_folder_copy_file(source_folder, destination_folder, find_data.cFileName);
+            create_folder_process_file(source_folder, destination_folder, find_data.cFileName);
         }
 
     } while (FindNextFile(search_handle, &find_data)); 
