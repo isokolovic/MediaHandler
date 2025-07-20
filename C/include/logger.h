@@ -1,6 +1,5 @@
 #ifndef LOG_H
 #define LOG_H
-
 typedef enum{
     LOG_INFO,
     LOG_WARNING,
@@ -10,6 +9,4 @@ typedef enum{
 void init_logger(const char* filename); 
 void log_message(LogLevel level, const char* format, ...); 
 void close_logger(void); 
-
-
 #endif

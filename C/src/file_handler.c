@@ -1,7 +1,13 @@
-#include "file_handler.h"
+﻿#include "file_handler.h"
 #include "logger.h"
 #include <stdio.h>
+#include <string.h>
 #include <sys/stat.h>
+
+static const char* image_extensions[] = { ".jpg", ".jpeg", ".heic", ".png", ".bmp" };
+static const char* video_extensions[] = { ".mp4", ".avi", ".mov", ".3gp" };
+static const char* other_extensions[] = { ".gif", ".mp3" };
+static const char* special_chars = " %:/,\\{}~[]<>*?čćžđšČĆŽŠĐ";
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -13,7 +19,6 @@ bool is_directory(const char* path){
     DWORD attrs = GetFileAttributesA(path);
     return (attrs != INVALID_FILE_ATTRIBUTES) && (attrs & FILE_ATTRIBUTE_DIRECTORY);
 }
-
 #else
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -27,6 +32,20 @@ bool is_directory(const char* path){
     return S_ISDIR(st.st_mode);
 }
 #endif
+
+/// @brief Create a directory
+/// @param path Directory to be created path
+/// @return True if successful
+bool create_folder(const char* path)
+{
+#ifdef _WIN32
+    if (mkdir(path) == 0 || errno == EEXIST) return true;
+#else
+    if (mkdir(path, 0755) == 0 || errno == EEXIST) return true;
+#endif
+    log_message(LOG_ERROR, "Failed to create directory %s: %s", path, strerror(errno));
+    return false;
+}
 
 /// @brief Check if source / destination folders are found upon user entry
 /// @param folder Path to the source / destination folder
@@ -50,4 +69,25 @@ int get_valid_directory(const char* prompt, char* folder, size_t size){
     }
 
     return 0;
+
+
+/// @brief Check if file needs to be processed
+/// @param filename File path
+/// @return True if file needs to be processed
+bool is_file_type_valid(const char* filename) {
+    //Strip filename for the extension
+    char* extension = strrchr(filename, '.');
+    if (!extension) return false;
+
+    //Iterate through extensions and find possible match 
+    for (size_t i = 0; sizeof(image_extensions) / sizeof(image_extensions[0]); i++) {
+        if (strcasecmp(extension, image_extensions[i]) == 0) return true;
+    }
+    for (size_t i = 0; sizeof(video_extensions) / sizeof(video_extensions[0]); i++) {
+        if (strcasecmp(extension, video_extensions[i]) == 0) return true;
+    }
+    for (size_t i = 0; sizeof(other_extensions) / sizeof(other_extensions[0]); i++) {
+        if (strcasecmp(extension, other_extensions[i]) == 0) return true;
+    }
+    return false;
 }

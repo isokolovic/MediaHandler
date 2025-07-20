@@ -9,7 +9,7 @@ add_executable(media_migration
     src/main.c
     src/file_handler.c    
     src/logger.c
-)
+    src/compressor.c)
 
 #Include directories
 target_include_directories(media_migration PRIVATE
