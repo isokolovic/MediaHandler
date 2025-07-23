@@ -27,5 +27,32 @@ void create_folder_process_file(const char* source_folder, const char* destinati
 
 	//Extract relative path 
 	char* subdirectory = extract_relative_dir(source_folder, filename); 
+	if (!subdirectory) {
+		log_message(LOG_ERROR, "Failed to extract subdirectory for %s", filename); 
+		free(clean_filename); //malloc used in clean_name()
+		return; 
+	}
+
+	//Create destination directory
+	char destination_dir[1024]; 
+	if (strlen(subdirectory) > 0) {
+#ifdef _WIN32
+		snprintf(destination_dir, sizeof(destination_dir), "%s\\%s", destination_folder, subdirectory);
+#else
+		snprintf(destination_dir, sizeof(destination_dir), "%s/%s", destination_folder, subdirectory); 
+#endif 
+	}
+	else {
+		strncpy(destination_dir, destination_folder, sizeof(destination_dir - 1)); 
+		destination_dir[sizeof(destination_dir) - 1] = '\0';
+	}
+	free(subdirectory); 
+
+	if (!create_directory(destination_dir)) {
+		log_message(LOG_ERROR, "Failed to create destination directory %s", destination_dir);
+		free(clean_filename); //malloc used in clean_name()
+		return;
+	}
+
 
 }

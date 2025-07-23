@@ -43,7 +43,7 @@ bool is_directory(const char* path){
 /// @brief Create a directory
 /// @param path Directory to be created path
 /// @return True if successful
-bool create_folder(const char* path)
+bool create_directory(const char* path)
 {
 #ifdef _WIN32
     if (mkdir(path) == 0 || errno == EEXIST) return true;
