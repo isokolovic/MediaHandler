@@ -9,5 +9,6 @@ bool is_directory(const char* path);
 bool is_file_type_valid(const char* filename); 
 bool create_folder(const char* root);
 char* clean_name(const char* element_name);
+char* extract_relative_dir(const char* file_path);
 
 #endif

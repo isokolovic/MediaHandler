@@ -1,8 +1,14 @@
 ﻿#include "file_handler.h"
 #include "logger.h"
 #include <stdio.h>
-#include <string.h>
 #include <sys/stat.h>
+
+#ifdef _WIN32
+#include <string.h>
+#define strcasecmp _stricmp
+#else
+#include <strings.h>
+#endif
 
 static const char* image_extensions[] = { ".jpg", ".jpeg", ".heic", ".png", ".bmp" };
 static const char* video_extensions[] = { ".mp4", ".avi", ".mov", ".3gp" };
@@ -49,7 +55,7 @@ bool create_folder(const char* path)
 
 /// @brief Clean file / folder name of any special characters
 /// @param element Element to be cleaned
-/// @return Cleaned name, NULL if error, "Unnamed" strlen(cleaned_element) == 0
+/// @return Cleaned name, NULL if error, "Unnamed" if strlen(cleaned_element) == 0
 char* clean_name(const char* element)
 {
     size_t length = strlen(element); 
@@ -71,13 +77,90 @@ char* clean_name(const char* element)
 
     if (strlen(cleaned_name) == 0) {
         free(cleaned_name); 
-        cleaned_name = strdump("Unnamed"); 
+        cleaned_name = strdup("Unnamed"); 
         if (!cleaned_name) {
             log_message(LOG_ERROR, "Memory allocation failed for clean_name");
             return NULL;
         }
     }
     return cleaned_name;
+}
+
+/// @brief Extract relative path (subfolder)
+/// @param file_path Full file path
+/// @return Subfolder
+char* extract_relative_dir(const char* source_path, const char* file_path)
+{
+    if (!source_path || !file_path) {
+        log_message(LOG_ERROR, "Null parameter in extract_relative_dir");
+        return NULL;
+    }
+
+    char* last_step = strchr(file_path, "\\"); 
+    if (!last_step) last_step = strchr(file_path, "/"); 
+    if (!last_step) {
+        log_message(LOG_ERROR, "No subdirectory path in %s, returning empty path.");
+        return strdup(""); 
+    }
+
+    size_t dir_len = last_step - file_path; 
+    char* file_directory = malloc(dir_len + 1); 
+    if (!file_directory) {
+        log_message(LOG_ERROR, "Memory allocation for file_directory failed.");
+        return strdup("");
+    }
+    strncpy(file_directory, file_path, dir_len); 
+    file_directory[dir_len] = '\0';
+
+    size_t source_dir_len = strlen(source_path);
+    size_t folder_len = strlen(file_directory); 
+    const char* relative_path = ""; 
+    //Check if file directory starts with the same path as source directory
+    if (strncmp(file_directory, source_path, source_dir_len) == 0 && folder_len > source_dir_len) {
+        //Move the pointer forward past the base directory to get the remaining path
+        relative_path = file_path + source_dir_len;
+        //If relative path starts with slashes, move pointer up by one byte (sizeof(char)) to clean slashes
+        if (relative_path[0] == '/' || relative_path[0] == "\\") {
+            relative_path++; 
+        }
+    }
+
+    //Clean subfolder of special characters and return
+    char* cleaned_subfoler = clean_name(relative_path); 
+    if (!cleaned_subfoler) {
+        log_message(LOG_ERROR, "Failed to create relative path %s", relative_path);
+        return strdup("");
+    }
+
+    return cleaned_subfoler;
+//
+//
+//
+//
+//
+//    char* slash = strchr(file_path, "/"); 
+//    char* backslash = strchr(file_path, "\\");
+//    //Consider deeper path separator as last one (whichever is further down the string's end)
+//    char* last_step = slash > backslash ? slash : backslash;
+//    if (!last_step) return strdup(""); //No subdirectories
+//
+//    size_t dir_length = last_step - file_path;
+//    char* relative_dir = malloc(dir_length + 1); 
+//    if (!relative_dir) {
+//        log(LOG_ERROR, "Memory allocation for relative_dir failed"); 
+//        return NULL;
+//    }
+//    strncpy(relative_dir, file_path, dir_length); 
+//    relative_dir[dir_length] = '\0';
+//
+//    char* cleaned_subdir = clean_name(relative_dir); 
+//    free(relative_dir); 
+//    if (!cleaned_subdir) {
+//        log_message(LOG_ERROR, "Failed to clean relative_dir"); 
+//        return NULL;
+//    }
+//
+//    return cleaned_subdir;
 }
 
 /// @brief Check if source / destination folders are found upon user entry
@@ -103,7 +186,6 @@ int get_valid_directory(const char* prompt, char* folder, size_t size) {
 
     return 0;
 }
-
 
 /// @brief Check if file needs to be processed
 /// @param filename File path
