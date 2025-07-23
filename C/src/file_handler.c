@@ -14,6 +14,7 @@ static const char* image_extensions[] = { ".jpg", ".jpeg", ".heic", ".png", ".bm
 static const char* video_extensions[] = { ".mp4", ".avi", ".mov", ".3gp" };
 static const char* other_extensions[] = { ".gif", ".mp3" };
 static const char* special_chars = " %:/,.\\{}~[]<>*?čćžđšČĆŽŠĐ";
+static const char* folder_special_chars = "%:/,.\\{}~[]<>*?čćžđšČĆŽŠĐ";
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -56,7 +57,7 @@ bool create_folder(const char* path)
 /// @brief Clean file / folder name of any special characters
 /// @param element Element to be cleaned
 /// @return Cleaned name, NULL if error, "Unnamed" if strlen(cleaned_element) == 0
-char* clean_name(const char* element)
+char* clean_name(const char* element, bool is_directory )
 {
     size_t length = strlen(element); 
     char* cleaned_name = malloc(length + 1); 
@@ -69,7 +70,10 @@ char* clean_name(const char* element)
     size_t j = 0; 
     for (size_t i = 0; i < length; i++) {
         char ch = element[i]; 
-        if (!strchr(special_chars, ch)) {
+        if (is_directory && !strchr(folder_special_chars, ch)) {
+            cleaned_name[j++] = ch;
+        }
+        else if (!strchr(special_chars, ch)) {
             cleaned_name[j++] = ch;
         }
     }
@@ -96,8 +100,9 @@ char* extract_relative_dir(const char* source_path, const char* file_path)
         return NULL;
     }
 
-    char* last_step = strchr(file_path, "\\"); 
-    if (!last_step) last_step = strchr(file_path, "/"); 
+    //Search from end of the string and find a separator
+    char* last_step = strrchr(file_path, '\\');
+    if (!last_step) last_step = strrchr(file_path, ' / ');
     if (!last_step) {
         log_message(LOG_ERROR, "No subdirectory path in %s, returning empty path.");
         return strdup(""); 
@@ -118,49 +123,39 @@ char* extract_relative_dir(const char* source_path, const char* file_path)
     //Check if file directory starts with the same path as source directory
     if (strncmp(file_directory, source_path, source_dir_len) == 0 && folder_len > source_dir_len) {
         //Move the pointer forward past the base directory to get the remaining path
-        relative_path = file_path + source_dir_len;
+        relative_path = file_directory + source_dir_len;
         //If relative path starts with slashes, move pointer up by one byte (sizeof(char)) to clean slashes
         if (relative_path[0] == '/' || relative_path[0] == "\\") {
             relative_path++; 
         }
     }
 
+    //Extract first subfolder
+    char* next_step = strchr(relative_path, '\\'); 
+    if (!next_step) next_step = strchr(relative_path, '/');
+    
+    size_t subfolder_length = next_step ? (size_t)(next_step - relative_path) : strlen(relative_path); 
+    char* first_subfolder = malloc(subfolder_length + 1); 
+    if (!first_subfolder) {
+        log_message(LOG_ERROR, "Memory allocation for first_subfolder failed"); 
+        free(file_directory); 
+        return strdup(""); 
+    }
+    strncpy(first_subfolder, relative_path, subfolder_length); 
+    first_subfolder[subfolder_length] = '\0'; 
+
     //Clean subfolder of special characters and return
-    char* cleaned_subfoler = clean_name(relative_path); 
-    if (!cleaned_subfoler) {
+    char* cleaned_subfolder = clean_name(relative_path, true); 
+    if (!cleaned_subfolder) {
         log_message(LOG_ERROR, "Failed to create relative path %s", relative_path);
+        free(file_directory); 
+        free(first_subfolder); 
         return strdup("");
     }
 
-    return cleaned_subfoler;
-//
-//
-//
-//
-//
-//    char* slash = strchr(file_path, "/"); 
-//    char* backslash = strchr(file_path, "\\");
-//    //Consider deeper path separator as last one (whichever is further down the string's end)
-//    char* last_step = slash > backslash ? slash : backslash;
-//    if (!last_step) return strdup(""); //No subdirectories
-//
-//    size_t dir_length = last_step - file_path;
-//    char* relative_dir = malloc(dir_length + 1); 
-//    if (!relative_dir) {
-//        log(LOG_ERROR, "Memory allocation for relative_dir failed"); 
-//        return NULL;
-//    }
-//    strncpy(relative_dir, file_path, dir_length); 
-//    relative_dir[dir_length] = '\0';
-//
-//    char* cleaned_subdir = clean_name(relative_dir); 
-//    free(relative_dir); 
-//    if (!cleaned_subdir) {
-//        log_message(LOG_ERROR, "Failed to clean relative_dir"); 
-//        return NULL;
-//    }
-//
-//    return cleaned_subdir;
+    free(file_directory);
+    free(first_subfolder);
+    return cleaned_subfolder;
 }
 
 /// @brief Check if source / destination folders are found upon user entry
@@ -177,9 +172,9 @@ int get_valid_directory(const char* prompt, char* folder, size_t size) {
     //Set value of first newline character to '\0' (remove newline)
     folder[strcspn(folder, "\n")] = 0;
 
-    //Validate the source folder
+    //Validate folder location
     if (!is_directory(folder)) {
-        log_message(LOG_ERROR, "Source folder %s does not exist", folder);
+        log_message(LOG_ERROR, "Folder %s does not exist", folder);
         close_logger();
         return 1;
     }
