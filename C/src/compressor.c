@@ -56,8 +56,7 @@ void create_folder_process_file(const char* source_folder, const char* destinati
 	}
 
 	//Create a file path and make a copy on the destination location
-	if (file_exists(destination_dir)) {
-		long file_size = get_fil
-	}
+	//if (file_exists(destination_dir)) {
+	//}
 
 }

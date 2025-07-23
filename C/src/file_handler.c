@@ -1,17 +1,26 @@
-﻿#include "file_handler.h"
-#include "logger.h"
-#include <stdio.h>
+﻿#include <stdio.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include "file_handler.h"
+#include "logger.h"
+
 #ifdef _WIN32
 #include <string.h>
+#include <direct.h>
+#include <Windows.h>
 #define STAT_STRUCT struct _stat
 #define STAT_FUNC _stat
+#define strcasecmp _stricmp
+#define mkdir _mkdir
 #else
 #include <strings.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #define STAT_STRUCT struct stat
 #define STAT_FUNC stat
+#define mkdir(path) mkdir(path, 0755)
 #endif
 
 static const char* image_extensions[] = { ".jpg", ".jpeg", ".heic", ".png", ".bmp" };
@@ -21,8 +30,6 @@ static const char* special_chars = " %:/,.\\{}~[]<>*?čćžđšČĆŽŠĐ";
 static const char* folder_special_chars = "%:/,.\\{}~[]<>*?čćžđšČĆŽŠĐ";
 
 #ifdef _WIN32
-#include <Windows.h>
-
 /// @brief Check if provided path is a directory for Windows OS
 /// @param path Path provided by the user
 /// @return 1 if the path is a directory, 0 otherwise
@@ -31,9 +38,6 @@ bool is_directory(const char* path){
     return (attrs != INVALID_FILE_ATTRIBUTES) && (attrs & FILE_ATTRIBUTE_DIRECTORY);
 }
 #else
-#include <sys/types.h>
-#include <sys/stat.h>
-
 /// @brief Check if provided path is a directory for Linux OS
 /// @param path Path provided by the user
 /// @return 1 if the path is a directory, 0 otherwise
@@ -49,12 +53,8 @@ bool is_directory(const char* path){
 /// @return True if successful
 bool create_directory(const char* path)
 {
-#ifdef _WIN32
     if (mkdir(path) == 0 || errno == EEXIST) return true;
-#else
-    if (mkdir(path, 0755) == 0 || errno == EEXIST) return true;
-#endif
-    log_message(LOG_ERROR, "Failed to create directory %s: %s", path, strerror(errno));
+    log_message(LOG_ERROR, "Failed to create directory %s: %s", path, strerror(errno)); 
     return false;
 }
 
@@ -118,8 +118,12 @@ char* extract_relative_dir(const char* source_path, const char* file_path)
         log_message(LOG_ERROR, "Memory allocation for file_directory failed.");
         return strdup("");
     }
+#ifdef _WIN32
+    strncpy_s(file_directory, dir_len + 1, file_path, dir_len); 
+#else
     strncpy(file_directory, file_path, dir_len); 
     file_directory[dir_len] = '\0';
+#endif
 
     size_t source_dir_len = strlen(source_path);
     size_t folder_len = strlen(file_directory); 
@@ -145,8 +149,12 @@ char* extract_relative_dir(const char* source_path, const char* file_path)
         free(file_directory); 
         return strdup(""); 
     }
+#ifdef _WIN32
+    strncpy_s(first_subfolder, subfolder_length + 1, relative_path, subfolder_length);
+#else
     strncpy(first_subfolder, relative_path, subfolder_length); 
     first_subfolder[subfolder_length] = '\0'; 
+#endif
 
     //Clean subfolder of special characters and return
     char* cleaned_subfolder = clean_name(relative_path, true); 
