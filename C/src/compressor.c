@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "compressor.h"
 #include "logger.h"
@@ -54,5 +55,9 @@ void create_folder_process_file(const char* source_folder, const char* destinati
 		return;
 	}
 
+	//Create a file path and make a copy on the destination location
+	if (file_exists(destination_dir)) {
+		long file_size = get_fil
+	}
 
 }

@@ -2,12 +2,16 @@
 #include "logger.h"
 #include <stdio.h>
 #include <sys/stat.h>
-
+#include <sys/types.h>
 #ifdef _WIN32
 #include <string.h>
-#define strcasecmp _stricmp
+#define STAT_STRUCT struct _stat
+#define STAT_FUNC _stat
 #else
 #include <strings.h>
+#include <unistd.h>
+#define STAT_STRUCT struct stat
+#define STAT_FUNC stat
 #endif
 
 static const char* image_extensions[] = { ".jpg", ".jpeg", ".heic", ".png", ".bmp" };
@@ -156,6 +160,18 @@ char* extract_relative_dir(const char* source_path, const char* file_path)
     free(file_directory);
     free(first_subfolder);
     return cleaned_subfolder;
+}
+
+/// @brief Get file size 
+/// @param path Path to a file
+/// @return File size
+long long get_file_size(const char* path)
+{
+    STAT_STRUCT st;
+    if (STAT_FUNC(path, &st) == 0) return (long long)st.st_size;
+    
+    log_message(LOG_ERROR, "File %s doesn't exist", path, strerror(errno));
+    return -1;
 }
 
 /// @brief Check if source / destination folders are found upon user entry
