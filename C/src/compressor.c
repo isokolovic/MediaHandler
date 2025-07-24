@@ -64,7 +64,7 @@ void create_folder_process_file(const char* source_folder, const char* destinati
 	snprintf(destination_path, sizeof(destination_path), "%s/%s", destination_path, clean_filename);
 #endif
 
-	//Extract extension from clean_filename and build filename: base + _copy + extension
+	//Extract file extension from clean_filename and build filename: base + _copy + extension
 	const char* last_step = strrchr(filename, '\\');
 	if (!last_step) last_step = strrchr(filename, '/'); 
 	const char* raw_filename = last_step ? last_step + 1 : filename;
@@ -85,7 +85,7 @@ void create_folder_process_file(const char* source_folder, const char* destinati
 		return;
 	}
 
-	//Create temporary copy to be compressed
+	//Create path of temporary copy to be compressed 
 	char temp_filename[1024]; 
 	if (extension) {
 		snprintf(temp_filename, sizeof(temp_filename), "%s_copy%s", clean_basename, extension);
@@ -95,7 +95,7 @@ void create_folder_process_file(const char* source_folder, const char* destinati
 	}
 	free(clean_basename);
 
-	//File copy destination path
+	//Copy file to the destination path
 	char temp_file[1024]; 
 #ifdef _WIN32
 	snprintf(temp_file, sizeof(temp_file), "%s\\%s", destination_dir, temp_filename);
