@@ -49,6 +49,58 @@ bool is_directory(const char* path){
 }
 #endif
 
+/// @brief Copy file from the source to the destination
+/// @param source Copy source
+/// @param destination Copy destination
+/// @return True if copying is successful
+bool copy_file(const char* source, const char* destination) {
+    FILE* source_file = fopen(source, "rb"); 
+    if (!source_file) {
+        log_message(LOG_ERROR, "Failed to open the file: %s", source, strerror(errno));
+        return false;
+    }
+
+    FILE* destination_file = fopen(destination, "wb");
+    if (!destination_file) {
+        log_message(LOG_ERROR, "Failed to open the file: %s", destination, strerror(errno));
+        return false;
+    }
+
+#ifndef _WIN32
+    if (chmod(fileno(destination_file), 0644) != 0) {
+        log_message(LOG_WARNING, "Failed to set the permission for %s", destination, strerror(errno));
+        //Try even without setting the permission
+    }
+#endif
+
+    //Copy the file
+    char buffer[8192];  //8KB temporary buffer to read from and write to in chunks
+    size_t bytes;
+    bool success = true;
+    while ((bytes = fread(buffer, 1, sizeof(buffer), source)) > 0) {
+        if (fwrite(buffer, 1, bytes, destination_file) != bytes) {
+            log_message(LOG_ERROR, "Failed to write to %s: %s", destination, strerror(errno));
+            success = false;
+            break;
+        }
+    }
+
+    if (ferror(source_file)) {
+        log_message(LOG_ERROR, "Error reading from %s: %s", source, strerror(errno));
+        success = false;
+    }
+    if (fclose(source_file) != 0) {
+        log_message(LOG_ERROR, "Failed to close source %s: %s", source, strerror(errno)); 
+        success = false;
+    }
+    if (fclose(destination_file) != 0) {
+        log_message(LOG_ERROR, "Failed to close destination %s: %s", destination, strerror(errno));
+        success = false;
+    }
+
+    return success;
+}
+
 /// @brief Create a directory
 /// @param path Directory to be created path
 /// @return True if successful
