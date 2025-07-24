@@ -26,7 +26,8 @@
 static const char* image_extensions[] = { ".jpg", ".jpeg", ".heic", ".png", ".bmp" };
 static const char* video_extensions[] = { ".mp4", ".avi", ".mov", ".3gp" };
 static const char* other_extensions[] = { ".gif", ".mp3" };
-static const char* special_chars = " %:/,.\\{}~[]<>*?čćžđšČĆŽŠĐ";
+//Think twice before modifying (. = file extension, " " used in folder naming, etc.) 
+static const char* special_chars = " %:/,\\{}~[]<>*?čćžđšČĆŽŠĐ";
 static const char* folder_special_chars = "%:/,.\\{}~[]<>*?čćžđšČĆŽŠĐ";
 
 #ifdef _WIN32
