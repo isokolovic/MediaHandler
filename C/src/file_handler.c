@@ -58,6 +58,15 @@ bool create_directory(const char* path)
     return false;
 }
 
+/// @brief Check if file exist on specified path
+/// @param path Path to a file
+/// @return True if file exists
+bool file_exists(const char* path)
+{
+    struct stat st;
+    return stat(path, &st) == 0;
+}
+
 /// @brief Clean file / folder name of any special characters
 /// @param element Element to be cleaned
 /// @return Cleaned name, NULL if error, "Unnamed" if strlen(cleaned_element) == 0
@@ -173,7 +182,7 @@ char* extract_relative_dir(const char* source_path, const char* file_path)
 /// @brief Get file size 
 /// @param path Path to a file
 /// @return File size
-long long get_file_size(const char* path)
+long get_file_size(const char* path)
 {
     STAT_STRUCT st;
     if (STAT_FUNC(path, &st) == 0) return (long long)st.st_size;

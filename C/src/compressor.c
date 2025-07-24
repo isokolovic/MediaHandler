@@ -56,7 +56,32 @@ void create_folder_process_file(const char* source_folder, const char* destinati
 	}
 
 	//Create a file path and make a copy on the destination location
-	//if (file_exists(destination_dir)) {
-	//}
+	char destination_path[1024]; 
+#ifdef _WIN32
+	snprintf(destination_path, sizeof(destination_path), "%s\\%s", destination_path, clean_filename);
+#else
+	snprintf(destination_path, sizeof(destination_path), "%s/%s", destination_path, clean_filename);
+#endif
+
+	if (file_exists(destination_path)) {
+		long file_size = get_file_size(filename); 
+		long file_copy_size = get_file_size(destination_path);
+
+		if (file_size > file_copy_size) {
+			log_message(LOG_WARNING, "Compressed copy already exists at the location %s", destination_path);
+			return;
+		}
+	}
+
+	//Create temporary copy to be compressed
+	char temp_file[1024]; 
+	snprintf(temp_file, sizeof(temp_file), "%s%s_copy", destination_dir, clean_filename); 
+	if (!temp_file) {
+		log_message(LOG_ERROR, "Failed to create temporary file copy for %s", temp_file); 
+		free(clean_filename); 
+		return;
+	}
+
+
 
 }
