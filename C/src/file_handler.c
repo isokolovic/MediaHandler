@@ -77,7 +77,7 @@ bool copy_file(const char* source, const char* destination) {
     char buffer[8192];  //8KB temporary buffer to read from and write to in chunks
     size_t bytes;
     bool success = true;
-    while ((bytes = fread(buffer, 1, sizeof(buffer), source)) > 0) {
+    while ((bytes = fread(buffer, 1, sizeof(buffer), source_file)) > 0) {
         if (fwrite(buffer, 1, bytes, destination_file) != bytes) {
             log_message(LOG_ERROR, "Failed to write to %s: %s", destination, strerror(errno));
             success = false;

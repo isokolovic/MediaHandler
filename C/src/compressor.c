@@ -64,16 +64,6 @@ void create_folder_process_file(const char* source_folder, const char* destinati
 	snprintf(destination_path, sizeof(destination_path), "%s/%s", destination_path, clean_filename);
 #endif
 
-	if (file_exists(destination_path)) {
-		long file_size = get_file_size(filename); 
-		long file_copy_size = get_file_size(destination_path);
-
-		if (file_size > file_copy_size) {
-			log_message(LOG_WARNING, "Compressed copy already exists at the location %s", destination_path);
-			return;
-		}
-	}
-
 	//Extract extension from clean_filename and build filename: base + _copy + extension
 	const char* last_step = strrchr(filename, '\\');
 	if (!last_step) last_step = strrchr(filename, '/'); 
@@ -105,17 +95,31 @@ void create_folder_process_file(const char* source_folder, const char* destinati
 	}
 	free(clean_basename);
 
+	//File copy destination path
 	char temp_file[1024]; 
 #ifdef _WIN32
 	snprintf(temp_file, sizeof(temp_file), "%s\\%s", destination_dir, temp_filename);
 #else
 	snprintf(temp_file, sizeof(temp_file), "%s/%s", destination_dir, temp_filename);
 #endif 
-	if (!temp_file) {
+
+	if (file_exists(destination_path)) {
+		long file_size = get_file_size(filename);
+		long file_copy_size = get_file_size(destination_path);
+
+		if (file_size > file_copy_size) {
+			log_message(LOG_WARNING, "Compressed copy already exists at the location %s", destination_path);
+			return;
+		}
+	}
+
+	if (!copy_file(filename, temp_file)) {
 		log_message(LOG_ERROR, "Failed to create temporary file copy for %s", temp_file); 
 		free(clean_filename); 
 		return;
 	}
+
+
 
 
 
