@@ -77,7 +77,7 @@ bool is_video(const char* filename) {
 /// @brief Check if file type is gif or other supported
 /// @param filename Path to a file
 /// @return True if gif or other supported type
-bool is_image(const char* filename) {
+bool is_gif_misc(const char* filename) {
     const char* extension = strrchr(filename, '.');
     if (!extension) return false;
     for (size_t i = 0; sizeof(other_extensions) / sizeof(other_extensions[0]); i++) {
@@ -309,5 +309,5 @@ int get_valid_directory(const char* prompt, char* folder, size_t size) {
 /// @param filename File path
 /// @return True if file needs to be processed
 bool is_file_type_valid(const char* filename) {
-    return is_image(filename) || is_video(filename) || is_gif_or_misc(filename);
+    return is_image(filename) || is_video(filename) || is_gif_misc(filename);
 }
