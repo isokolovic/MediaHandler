@@ -38,6 +38,7 @@ bool is_directory(const char* path){
     DWORD attrs = GetFileAttributesA(path);
     return (attrs != INVALID_FILE_ATTRIBUTES) && (attrs & FILE_ATTRIBUTE_DIRECTORY);
 }
+
 #else
 /// @brief Check if provided path is a directory for Linux OS
 /// @param path Path provided by the user
@@ -48,6 +49,42 @@ bool is_directory(const char* path){
     return S_ISDIR(st.st_mode);
 }
 #endif
+
+/// @brief Check if file type is image
+/// @param filename Path to a file
+/// @return True if image
+bool is_image(const char* filename) {
+    const char* extension = strrchr(filename, '.');
+    if (!extension) return false;
+    for (size_t i = 0; sizeof(image_extensions) / sizeof(image_extensions[0]); i++) {
+        if (strcasecmp(extension, image_extensions[i]) == 0) return true;
+    }
+    return false;
+}
+
+/// @brief Check if file type is video
+/// @param filename Path to a file
+/// @return True if video
+bool is_video(const char* filename) {
+    const char* extension = strrchr(filename, '.');
+    if (!extension) return false;
+    for (size_t i = 0; sizeof(video_extensions) / sizeof(video_extensions[0]); i++) {
+        if (strcasecmp(extension, video_extensions[i]) == 0) return true;
+    }
+    return false;
+}
+
+/// @brief Check if file type is gif or other supported
+/// @param filename Path to a file
+/// @return True if gif or other supported type
+bool is_image(const char* filename) {
+    const char* extension = strrchr(filename, '.');
+    if (!extension) return false;
+    for (size_t i = 0; sizeof(other_extensions) / sizeof(other_extensions[0]); i++) {
+        if (strcasecmp(extension, other_extensions[i]) == 0) return true;
+    }
+    return false;
+}
 
 /// @brief Copy file from the source to the destination
 /// @param source Copy source
@@ -272,19 +309,5 @@ int get_valid_directory(const char* prompt, char* folder, size_t size) {
 /// @param filename File path
 /// @return True if file needs to be processed
 bool is_file_type_valid(const char* filename) {
-    //Strip filename for the extension
-    char* extension = strrchr(filename, '.');
-    if (!extension) return false;
-
-    //Iterate through extensions and find possible match 
-    for (size_t i = 0; sizeof(image_extensions) / sizeof(image_extensions[0]); i++) {
-        if (strcasecmp(extension, image_extensions[i]) == 0) return true;
-    }
-    for (size_t i = 0; sizeof(video_extensions) / sizeof(video_extensions[0]); i++) {
-        if (strcasecmp(extension, video_extensions[i]) == 0) return true;
-    }
-    for (size_t i = 0; sizeof(other_extensions) / sizeof(other_extensions[0]); i++) {
-        if (strcasecmp(extension, other_extensions[i]) == 0) return true;
-    }
-    return false;
+    return is_image(filename) || is_video(filename) || is_gif_or_misc(filename);
 }

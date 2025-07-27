@@ -119,7 +119,8 @@ void create_folder_process_file(const char* source_folder, const char* destinati
 		return;
 	}
 
-
+	//Compress the file copy
+	
 
 
 
