@@ -1,9 +1,46 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <jpeglib.h>
+
 #include "compressor.h"
 #include "logger.h"
 #include "file_handler.h"
+
+/// @brief Main function for file compression
+/// @param file File to be compressed
+/// @param output_file Compressed file
+/// @return True if successful
+bool compress_file(const char* file, const char* output_file) {
+	if (!file || !output_file) {
+		log_message(LOG_ERROR, "Null input or output path in compress_file"); 
+		return false;
+	}
+	if (is_image(file)) {
+		return compress_image(file, output_file);
+	}
+
+}
+
+/// @brief Compress image file
+/// @param file Input image
+/// @param output_file Compressed image
+/// @return True if compression successful
+bool compress_image(const char* file, const char* output_file)
+{
+	struct heif_context* context = NULL;
+	struct heif_image_handle* handle = NULL;
+	struct heif_image* image = NULL;
+	struct heif_encoder* encoder = NULL;
+	
+	FILE* infile = NULL;
+	FILE* outfile = NULL;
+
+	struct jpeg_decompress_struct cinfo;
+
+
+	return false;
+}
 
 /// @brief Create folder if needed and copy compressed file to the destination
 /// @param root Root folder 
@@ -86,12 +123,15 @@ void create_folder_process_file(const char* source_folder, const char* destinati
 	}
 
 	//Create path of temporary copy to be compressed 
-	char temp_filename[1024]; 
+	char temp_filename[1024];
+	char compressed_filename[1024];
 	if (extension) {
 		snprintf(temp_filename, sizeof(temp_filename), "%s_copy%s", clean_basename, extension);
+		snprintf(compressed_filename, sizeof(temp_filename), "%s%s", clean_basename, extension);
 	}
 	else {
 		snprintf(temp_filename, sizeof(temp_filename), "%s_copy", clean_basename);
+		snprintf(compressed_filename, sizeof(temp_filename), "%s", clean_basename);
 	}
 	free(clean_basename);
 
@@ -120,7 +160,7 @@ void create_folder_process_file(const char* source_folder, const char* destinati
 	}
 
 	//Compress the file copy
-	
+	bool compressed = compress_file(temp_filename, compressed_filename);
 
 
 
