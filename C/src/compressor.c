@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <jpeglib.h>
+#include <libheif/heif.h>
+#include <libexif/exif-data.h> 
 
 #include "compressor.h"
 #include "logger.h"
@@ -37,9 +39,11 @@ bool compress_image(const char* file, const char* output_file)
 	FILE* outfile = NULL;
 
 	struct jpeg_decompress_struct cinfo;
+	struct jpeg_compress_struct cinfo_out;
+	struct jpeg_error_mgr jerr;
 
 
-	return false;
+
 }
 
 /// @brief Create folder if needed and copy compressed file to the destination
