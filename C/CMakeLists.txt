@@ -27,7 +27,7 @@ ExternalProject_Add(libheif
     GIT_SHALLOW TRUE
     PREFIX ${DEPS_DIR}/libheif
     CMAKE_ARGS ${LIBHEIF_CMAKE_ARGS}
-    BUILD_BYPRODUCTS ${LIBHEIF_INSTALL_DIR}/lib/libheif.a
+    BUILD_BYPRODUCTS ${LIBHEIF_INSTALL_DIR}/lib/heif.lib
 )
 
 # 🧱 External project: libjpeg-turbo
