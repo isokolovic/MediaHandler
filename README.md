@@ -1,6 +1,6 @@
 # 📁 Media Files Handler
 
-💡 For someone not willing to use / pay for cloud storage. 
+💡 For those low on space and done with paying for cloud storage. 
 
 ---
 
