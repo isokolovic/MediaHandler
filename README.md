@@ -8,6 +8,8 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
 - Specify the source and destination directories as command-line arguments.  
 - The tool compresses multimedia files (from source folder) and recreates the folder structure at the destination.
 
+**Incoming: Usecase when User has bunch of unorganized media and wants to sort them by creation**
+
 ---
 
 ## 🐍 Python Version
