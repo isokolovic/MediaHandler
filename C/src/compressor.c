@@ -4,7 +4,7 @@
 #include <jpeglib.h>
 #include <libheif/heif.h>
 #include <libexif/exif-data.h> 
-
+#include <libavformat/avformat.h>
 #include "compressor.h"
 #include "logger.h"
 #include "file_handler.h"
@@ -21,7 +21,7 @@ bool compress_file(const char* file, const char* output_file) {
 	if (is_image(file)) {
 		return compress_image(file, output_file);
 	}
-
+	
 }
 
 /// @brief Compress image file
@@ -38,9 +38,84 @@ bool compress_image(const char* file, const char* output_file)
 	FILE* infile = NULL;
 	FILE* outfile = NULL;
 
-	struct jpeg_decompress_struct cinfo;
-	struct jpeg_compress_struct cinfo_out;
-	struct jpeg_error_mgr jerr;
+	const char* extension = strrchr(file, '.');
+	if (!extension) {
+		log_message(LOG_ERROR, "No extension found for %s", file); 
+		return false;
+	}
+
+	//Libheif compression used for heic files
+	if (strcmp(extension, "heic") == 0) {
+		context = heif_context_alloc();
+		if (!context) {
+			log_message(LOG_ERROR, "Failed to allocate heif conext for %s", file); 
+			return false;
+		}
+
+		//Read the file
+		struct heif_error err = heif_context_read_from_file(context, file, NULL); 
+		if (err.code != heif_error_Ok) {
+			heif_context_free(context);
+			log_message(LOG_ERROR, "Failed to read .heic file %s: %s", file, err.message);
+			return false;
+		}
+
+		//Get image handle (metadata and decoding functions)
+		err = heif_context_get_primary_image_handle(context, &handle);
+		if (err.code != heif_error_Ok) {
+			heif_context_free(context);
+			log_message(LOG_ERROR, "Failed to get image handle for %s: %s", file, err.message);
+			return false;
+		}
+
+		//Decode a photo into usable format 
+		err = heif_decode_image(handle, &image, heif_colorspace_RGB, heif_chroma_420, NULL);
+		if (err.code != heif_error_Ok) {
+			heif_context_free(context);
+			log_message(LOG_ERROR, "Failed to decode .heic photo: %s: %s", file, err.message);
+			return false;
+		}
+
+		//Get encoder (compression engine)
+		err = heif_context_get_encoder_for_format(context, heif_compression_HEVC, &encoder);
+		if (err.code != heif_error_Ok) {
+			heif_context_free(context);
+			log_message(LOG_ERROR, "Failed to get .heic encoder for %s: %s", file, err.message);
+			return false;
+		}
+
+		//Set compression quality
+		heif_encoder_set_lossy_quality(encoder, PHOTO_QUALITY);
+
+		//Compress the image
+		err = heif_context_encode_image(context, image, encoder, NULL, NULL);
+		if (err.code != heif_error_Ok) {			
+			heif_context_free(context);
+			heif_image_release(image);
+			heif_encoder_release(encoder);
+			heif_image_handle_release(handle);
+			log_message(LOG_ERROR, "Failed to encode .hec file: %s: %s", file, err.message);
+			return false;
+		}
+
+		//Write to file and free created objects
+		err = heif_context_write_to_file(context, output_file);		
+		heif_context_free(context);
+		heif_image_release(image);
+		heif_encoder_release(encoder);
+		heif_image_handle_release(handle);
+		if (err.code != heif_error_Ok) {
+			log_message(LOG_ERROR, "Failed to save compressed .heic file: %s: %s", output_file, err.message);
+			return false;
+		}
+
+		return true;
+	}
+	else {
+
+
+	}
+
 
 
 
