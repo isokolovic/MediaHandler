@@ -2,6 +2,8 @@
 
 💡 For someone not willing to use / pay for cloud storage. 
 
+---
+
 Simple tool to compress and organize multimedia files (photos and videos). Available in two versions:  
 - 🐍 **Python**: Easy to use and modify.  
 - ⚙️ **C**: Optimized for speed and large-scale processing.
