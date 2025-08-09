@@ -1,6 +1,8 @@
 #ifndef FILE_HANDLER
 #define FILE_HANDLER
 
+#define strcasecmp _stricmp
+
 #include <stddef.h>
 #include <stdbool.h>
 

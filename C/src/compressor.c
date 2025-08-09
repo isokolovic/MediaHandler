@@ -5,6 +5,7 @@
 #include <libheif/heif.h>
 #include <libexif/exif-data.h> 
 #include <libavformat/avformat.h>
+#include <png.h>
 #include "compressor.h"
 #include "logger.h"
 #include "file_handler.h"
@@ -29,12 +30,7 @@ bool compress_file(const char* file, const char* output_file) {
 /// @param output_file Compressed image
 /// @return True if compression successful
 bool compress_image(const char* file, const char* output_file)
-{
-	struct heif_context* context = NULL;
-	struct heif_image_handle* handle = NULL;
-	struct heif_image* image = NULL;
-	struct heif_encoder* encoder = NULL;
-	
+{	
 	FILE* infile = NULL;
 	FILE* outfile = NULL;
 
@@ -45,7 +41,12 @@ bool compress_image(const char* file, const char* output_file)
 	}
 
 	//Libheif compression used for heic files
-	if (strcmp(extension, "heic") == 0) {
+	if (strcmp(extension, ".heic") == 0) {
+		struct heif_context* context = NULL;
+		struct heif_image_handle* handle = NULL;
+		struct heif_image* image = NULL;
+		struct heif_encoder* encoder = NULL;
+
 		context = heif_context_alloc();
 		if (!context) {
 			log_message(LOG_ERROR, "Failed to allocate heif conext for %s", file); 
@@ -111,14 +112,83 @@ bool compress_image(const char* file, const char* output_file)
 
 		return true;
 	}
+	//Libjpeg-turbo compression used for jpg/jpeg files
+	else if ((strcasecmp(extension, ".jpg") == 0) || strcasecmp(extension, ".jpeg") == 0){
+		struct jpeg_decompress_struct cinfo;
+		struct jpeg_compress_struct cinfo_out; 
+		struct jpeg_error_mgr jerr;
+
+		//Open file for reading
+		infile = fopen(file, "rb"); 
+		if (!infile) {
+			log_message(LOG_ERROR, "Failed to open %s for writing", file);
+			return false;
+		}
+
+		//Open output file for writing
+		outfile = fopen(output_file, "wb"); 
+		if (!outfile) {
+			fclose(file); 
+			log_message(LOG_ERROR, "Failed to open %s for writing", file); 
+			return false;
+		}
+
+		// Initialize .jpeg decompression and read image header from input file
+		cinfo.err = jpeg_std_error(&jerr); 
+		jpeg_create_decompress(&cinfo); 
+		jpeg_stdio_src(&cinfo, infile);
+		jpeg_read_header(&cinfo, TRUE); 
+
+		// Set up .jpeg compression and link output file as destination
+		cinfo_out.err = jpeg_std_error(&jerr); 
+		jpeg_create_compress(&cinfo_out); 
+		jpeg_stdio_dest(&cinfo_out, outfile); 
+
+		//Check if original photo smaller than trim dimensions
+		cinfo_out.image_width = cinfo.image_width > PHOTO_TRIM_WIDTH ? PHOTO_TRIM_WIDTH : cinfo.image_width; 
+		cinfo_out.image_height = cinfo.image_height > PHOTO_TRIM_HEIGHT ? PHOTO_TRIM_HEIGHT : cinfo.image_height;
+		cinfo_out.input_components = cinfo.jpeg_color_space == JCS_GRAYSCALE ? 1 : 3; //If not grayscale, RGB
+		cinfo_out.in_color_space = cinfo.jpeg_color_space == JCS_GRAYSCALE ? JCS_GRAYSCALE : JCS_RGB;
+		
+		jpeg_set_defaults(&cinfo_out); 
+		jpeg_set_quality(&cinfo_out, PHOTO_QUALITY, TRUE); 
+		jpeg_start_compress(&cinfo_out, TRUE); 
+
+		// Allocate a one-row scanline buffer to hold decompressed pixel data.
+		// Each row contains (image_width × num_components) bytes.
+		// This buffer will be reused for each scanline during JPEG decompression.
+		JSAMPARRAY buffer = (*cinfo.mem->alloc_sarray)(
+			(j_common_ptr)&cinfo,
+			JPOOL_IMAGE,
+			cinfo.image_width * cinfo.num_components,
+			1);
+
+		// Loop through each scanline of the input JPEG image.
+		// Read one scanline from the decompressor (cinfo) into buffer.
+		// Then write that scanline to the output compressor (cinfo_out), ensuring we don't exceed the image height.
+		while (cinfo.output_scanline < cinfo.image_height) {
+			jpeg_read_scanlines(&cinfo, buffer, 1);
+			
+			if (cinfo.output_scanline <= cinfo.image_height) {
+				jpeg_write_scanlines(&cinfo_out, buffer, 1);
+			}
+		}
+
+		//Clean up
+		jpeg_finish_compress(&cinfo_out);
+		jpeg_destroy_compress(&cinfo_out); 
+		jpeg_destroy_compress(&cinfo);
+		fclose(infile);
+		fclose(outfile); 
+		return true;
+	}
+	//Libpng compression used for png files
+	else if((strcasecmp(extension, ".png") == 0)){
+		png_structp png_read_ptr = NULL;
+	}
 	else {
 
-
 	}
-
-
-
-
 }
 
 /// @brief Create folder if needed and copy compressed file to the destination

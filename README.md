@@ -64,16 +64,21 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
        git clone https://github.com/microsoft/vcpkg.git
        cd vcpkg
        .\bootstrap-vcpkg.bat
-       ```  
+       ```
+       - Add vcpkg to path
+       ```cmd
+       Edit environment variables -> Add vcpkg root folder to Path (e.g. C:\vcpkg)
+       ```
+
      - Install dependencies:  
        ```cmd
-       .\vcpkg install libjpeg-turbo:x64-windows-static libheif:x64-windows-static libexif:x64-windows-static ffmpeg:x64-windows-static
-       .\vcpkg integrate
+       vcpkg install libjpeg-turbo:x64-windows-static libheif:x64-windows-static libexif:x64-windows-static ffmpeg:x64-windows-static libpng:x64-windows
+       vcpkg integrate install
        ```  
      - For more on `vcpkg`, see [Microsoft’s documentation](https://learn.microsoft.com/en-us/vcpkg/) or the [GitHub repository](https://github.com/microsoft/vcpkg).  
    - **Linux** 🐧: Run:  
      ```bash
-     sudo apt install libjpeg-dev libheif-dev libexif-dev libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
+     sudo apt install libjpeg-dev libheif-dev libexif-dev libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libpng-dev
      ```
 
 3. **🚀 Build and Run**:  

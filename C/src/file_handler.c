@@ -11,7 +11,6 @@
 #include <Windows.h>
 #define STAT_STRUCT struct _stat
 #define STAT_FUNC _stat
-#define strcasecmp _stricmp
 #define mkdir _mkdir
 #else
 #include <strings.h>
