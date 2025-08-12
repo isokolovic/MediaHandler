@@ -65,9 +65,9 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
        cd vcpkg
        .\bootstrap-vcpkg.bat
        ```
-       - Add vcpkg to path
+       - Add vcpkg to PATH
        ```cmd
-       Edit environment variables -> Add vcpkg root folder to Path (e.g. C:\vcpkg)
+       Edit environment variables -> Add vcpkg root folder to PATH (e.g. C:\vcpkg)
        ```
 
      - Install dependencies:  
