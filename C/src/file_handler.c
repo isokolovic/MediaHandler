@@ -145,6 +145,37 @@ bool create_directory(const char* path)
     if (mkdir(path) == 0 || errno == EEXIST) return true;
     log_message(LOG_ERROR, "Failed to create directory %s: %s", path, strerror(errno)); 
     return false;
+
+    char temp[1024]; 
+    strncpy(temp, path, sizeof(temp) - 1); 
+    temp[sizeof(temp) - 1] = '\0';
+
+#ifdef _WIN32
+    for (char* p = temp; *p; p++) if (*p == '/') *p = '\\';
+#else
+    for (char* p = temp; *p; p++) if (*p == '//') *p = '/';
+#endif
+
+    char* p = temp; 
+    if (p[0] == '/' || p[0] == '\\') p++; 
+    while (*p) {
+        if (*p == '/' || *p == '\\') {
+            *p = '\0';
+            if (strlen(temp) > 0) {
+                if (mkdir(temp) != 0 && errno != EEXIST) {
+                    log_message(LOG_ERROR, "Failed to create directory %s: %s", temp, strerror(errno));
+                    return false;
+                }
+            }
+            *p = '/';
+        }
+        p++;
+    }
+    if (mkdir(temp) != 0 && errno != EEXIST) {
+        log_message(LOG_ERROR, "Failed to create directory %s: %s", temp, strerror(errno));
+        return false;
+    }
+    return true;
 }
 
 /// @brief Check if file exist on specified path
@@ -158,9 +189,14 @@ bool file_exists(const char* path)
 
 /// @brief Clean file / folder name of any special characters
 /// @param element Element to be cleaned
-/// @return Cleaned name, NULL if error, "Unnamed" if strlen(cleaned_element) == 0
+/// @return Cleaned name, NULL if error, EMTPY_FILENAME if strlen(cleaned_element) == 0
 char* clean_name(const char* element, bool is_directory )
 {
+    if (!element) {
+        log_message(LOG_ERROR, "NULL element in clean_name");
+        return NULL;
+    }
+
     size_t length = strlen(element); 
     char* cleaned_name = malloc(length + 1); 
     if (!cleaned_name) {
@@ -183,11 +219,17 @@ char* clean_name(const char* element, bool is_directory )
 
     if (strlen(cleaned_name) == 0) {
         free(cleaned_name); 
-        cleaned_name = strdup("Unnamed"); 
-        if (!cleaned_name) {
-            log_message(LOG_ERROR, "Memory allocation failed for clean_name");
-            return NULL;
+        if (is_directory) {
+            return strdup(""); //Empty string for directories
         }
+        else {
+            cleaned_name = strdup(EMTPY_FILENAME); //Unnnamed files
+            if (!cleaned_name) {
+                log_message(LOG_ERROR, "Memory allocation failed for clean_name");
+                return NULL;
+            }
+        }
+        return cleaned_name;
     }
     return cleaned_name;
 }
@@ -202,70 +244,66 @@ char* extract_relative_dir(const char* source_path, const char* file_path)
         return NULL;
     }
 
-    //Search from end of the string and find a separator
-    char* last_step = strrchr(file_path, '\\');
-    if (!last_step) last_step = strrchr(file_path, ' / ');
-    if (!last_step) {
-        log_message(LOG_ERROR, "No subdirectory path in %s, returning empty path.");
-        return strdup(""); 
-    }
-
-    size_t dir_len = last_step - file_path; 
-    char* file_directory = malloc(dir_len + 1); 
-    if (!file_directory) {
-        log_message(LOG_ERROR, "Memory allocation for file_directory failed.");
-        return strdup("");
-    }
+    //Normalize paths
+    char normalized_source[1024];
+    char normalized_file[1024];
+    strncpy(normalized_source, source_path, sizeof(normalized_source) - 2);
+    normalized_source[sizeof(normalized_source) - 2] = '\0';
+    strncpy(normalized_file, file_path, sizeof(normalized_file) - 1);
+    normalized_file[sizeof(normalized_file) - 1] = '\0';
 #ifdef _WIN32
-    strncpy_s(file_directory, dir_len + 1, file_path, dir_len); 
+    for (char* p = normalized_source; *p; p++) if (*p == '/') *p = '\\';
+    for (char* p = normalized_file; *p; p++) if (*p == '/') *p = '\\';
 #else
-    strncpy(file_directory, file_path, dir_len); 
-    file_directory[dir_len] = '\0';
+    for (char* p = normalized_source; *p; p++) if (*p == '\\') *p = '/';
+    for (char* p = normalized_file; *p; p++) if (*p == '\\') *p = '/';
 #endif
 
-    size_t source_dir_len = strlen(source_path);
-    size_t folder_len = strlen(file_directory); 
-    const char* relative_path = ""; 
-    //Check if file directory starts with the same path as source directory
-    if (strncmp(file_directory, source_path, source_dir_len) == 0 && folder_len > source_dir_len) {
-        //Move the pointer forward past the base directory to get the remaining path
-        relative_path = file_directory + source_dir_len;
-        //If relative path starts with slashes, move pointer up by one byte (sizeof(char)) to clean slashes
-        if (relative_path[0] == '/' || relative_path[0] == "\\") {
-            relative_path++; 
-        }
-    }
-
-    //Extract first subfolder
-    char* next_step = strchr(relative_path, '\\'); 
-    if (!next_step) next_step = strchr(relative_path, '/');
-    
-    size_t subfolder_length = next_step ? (size_t)(next_step - relative_path) : strlen(relative_path); 
-    char* first_subfolder = malloc(subfolder_length + 1); 
-    if (!first_subfolder) {
-        log_message(LOG_ERROR, "Memory allocation for first_subfolder failed"); 
-        free(file_directory); 
-        return strdup(""); 
-    }
+    size_t source_len = strlen(normalized_source);
+    if (source_len > 0 && normalized_source[source_len - 1] != '/' && normalized_source[source_len - 1] != '\\') {
 #ifdef _WIN32
-    strncpy_s(first_subfolder, subfolder_length + 1, relative_path, subfolder_length);
+        strcat(normalized_source, "\\");
 #else
-    strncpy(first_subfolder, relative_path, subfolder_length); 
-    first_subfolder[subfolder_length] = '\0'; 
+        strcat(normalized_source, "/");
 #endif
+        source_len++;
+    }
 
-    //Clean subfolder of special characters and return
-    char* cleaned_subfolder = clean_name(relative_path, true); 
-    if (!cleaned_subfolder) {
-        log_message(LOG_ERROR, "Failed to create relative path %s", relative_path);
-        free(file_directory); 
-        free(first_subfolder); 
+    size_t file_len = strlen(normalized_file);
+    if (file_len < source_len || strncmp(normalized_file, normalized_source, source_len) != 0) {
+        log_message(LOG_WARNING, "File %s is not under source %s", normalized_file, normalized_source);
         return strdup("");
     }
 
-    free(file_directory);
-    free(first_subfolder);
-    return cleaned_subfolder;
+    // Extract relative path up to the last directory
+    const char* relative_path = normalized_file + source_len;
+    const char* last_sep = strrchr(relative_path, '/');
+    if (!last_sep) last_sep = strrchr(relative_path, '\\');
+    if (!last_sep) {
+        return strdup(""); // No subdirectory
+    }
+
+    size_t relative_len = (size_t)(last_sep - relative_path);
+    char* relative_dir = malloc(relative_len + 1);
+    if (!relative_dir) {
+        log_message(LOG_ERROR, "Memory allocation for relative_dir failed");
+        return strdup("");
+    }
+#ifdef _WIN32
+    strncpy_s(relative_dir, relative_len + 1, relative_path, relative_len);
+#else
+    strncpy(relative_dir, relative_path, relative_len);
+    relative_dir[relative_len] = '\0';
+#endif
+
+    // Clean the relative path
+    char* cleaned_dir = clean_name(relative_dir, true);
+    free(relative_dir);
+    if (!cleaned_dir) {
+        log_message(LOG_ERROR, "Failed to clean relative directory %s", relative_path);
+        return strdup("");
+    }
+    return cleaned_dir;
 }
 
 /// @brief Get file size 

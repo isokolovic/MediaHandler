@@ -2,6 +2,7 @@
 #define FILE_HANDLER
 
 #define strcasecmp _stricmp
+#define EMTPY_FILENAME "Unnamed"
 
 #include <stddef.h>
 #include <stdbool.h>

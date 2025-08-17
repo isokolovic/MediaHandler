@@ -22,7 +22,9 @@ bool compress_file(const char* file, const char* output_file) {
 	if (is_image(file)) {
 		return compress_image(file, output_file);
 	}
-	
+	if (is_video(file)) {
+		return compress_video(file, output_file); 
+	}	
 }
 
 /// @brief Compress image file
@@ -44,8 +46,30 @@ bool compress_image(const char* file, const char* output_file)
 	if (strcmp(extension, ".heic") == 0) {
 		struct heif_context* context = NULL;
 		struct heif_image_handle* handle = NULL;
+
 		struct heif_image* image = NULL;
 		struct heif_encoder* encoder = NULL;
+
+
+		//const char* const* dirs = heif_get_plugin_directories();
+		//if (!dirs) {
+		//	printf("No plugin directories found.\n");
+		//	return;
+		//}
+		//for (int i = 0; dirs[i]; ++i) {
+		//	printf("libheif plugin dir: %s\n", dirs[i]);
+		//}
+		//heif_free_plugin_directories(dirs);
+		
+		const char* const* dirs = heif_get_plugin_directories();
+		if (dirs) {
+			for (int i = 0; dirs[i]; ++i) {
+				if (dirs[i][0] != '\0') // Only print non-empty directories
+					printf("libheif plugin dir: %s\n", dirs[i]);
+			}
+			heif_free_plugin_directories(dirs);
+		}
+
 
 		context = heif_context_alloc();
 		if (!context) {
@@ -352,6 +376,30 @@ bool compress_image(const char* file, const char* output_file)
 	}
 }
 
+/// @brief Compress video file
+/// @param file Input video
+/// @param output_file Compressed video
+/// @return True if compression successful
+bool compress_video(const char* file, const char* output_file)
+{
+	// Video compression using ffmpeg's command line interface
+	// Uncomment if want to use that instead of manual.It's safer and less error-prone
+
+	char cmd[1024];
+	snprintf(cmd, sizeof(cmd), "ffmpeg -i \"%s\" -vcodec h264 \"%s\"", file, output_file);
+	int ret = system(cmd);
+	if (ret != 0) {
+		log_message(LOG_ERROR, "Failed to compress video %s: %d", file, ret);
+		return false;
+	}
+	return true;
+
+
+
+
+	return false;
+}
+
 /// @brief Create folder if needed and copy compressed file to the destination
 /// @param root Root folder 
 /// @param destination_folder Destination folder
@@ -392,7 +440,7 @@ void create_folder_process_file(const char* source_folder, const char* destinati
 #endif 
 	}
 	else {
-		strncpy(destination_dir, destination_folder, sizeof(destination_dir - 1)); 
+		strncpy(destination_dir, destination_folder, sizeof(destination_dir) - 1); 
 		destination_dir[sizeof(destination_dir) - 1] = '\0';
 	}
 	free(subdirectory); 
@@ -470,8 +518,8 @@ void create_folder_process_file(const char* source_folder, const char* destinati
 	}
 
 	//Compress the file copy
-	bool compressed = compress_file(temp_filename, compressed_filename);
-
+	//bool compressed = compress_file(temp_filename, compressed_filename);
+	bool compressed = compress_file(filename, temp_file);
 
 
 }
