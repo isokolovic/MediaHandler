@@ -94,7 +94,7 @@ bool compress_image(const char* file, const char* output_file)
 		}
 
 		//Decode a photo into usable format 
-		err = heif_decode_image(handle, &image, heif_colorspace_RGB, heif_chroma_420, NULL);
+		err = heif_decode_image(handle, &image, heif_colorspace_RGB, heif_chroma_interleaved_RGB, NULL);
 		if (err.code != heif_error_Ok) {
 			heif_context_free(context);
 			log_message(LOG_ERROR, "Failed to decode .heic photo: %s: %s", file, err.message);
@@ -459,7 +459,6 @@ void create_folder_process_file(const char* source_folder, const char* destinati
 	snprintf(destination_path, sizeof(destination_path), "%s/%s", destination_path, clean_filename);
 #endif
 
-	//Extract file extension from clean_filename and build filename: base + _copy + extension
 	const char* last_step = strrchr(filename, '\\');
 	if (!last_step) last_step = strrchr(filename, '/'); 
 	const char* raw_filename = last_step ? last_step + 1 : filename;
@@ -482,14 +481,11 @@ void create_folder_process_file(const char* source_folder, const char* destinati
 
 	//Create path of temporary copy to be compressed 
 	char temp_filename[1024];
-	char compressed_filename[1024];
 	if (extension) {
-		snprintf(temp_filename, sizeof(temp_filename), "%s_copy%s", clean_basename, extension);
-		snprintf(compressed_filename, sizeof(temp_filename), "%s%s", clean_basename, extension);
+		snprintf(temp_filename, sizeof(temp_filename), "%s%s", clean_basename, extension);
 	}
 	else {
-		snprintf(temp_filename, sizeof(temp_filename), "%s_copy", clean_basename);
-		snprintf(compressed_filename, sizeof(temp_filename), "%s", clean_basename);
+		snprintf(temp_filename, sizeof(temp_filename), "%s", clean_basename);
 	}
 	free(clean_basename);
 
@@ -518,8 +514,5 @@ void create_folder_process_file(const char* source_folder, const char* destinati
 	}
 
 	//Compress the file copy
-	//bool compressed = compress_file(temp_filename, compressed_filename);
 	bool compressed = compress_file(filename, temp_file);
-
-
 }
