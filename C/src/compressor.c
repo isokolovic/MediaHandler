@@ -5,6 +5,8 @@
 #include <libheif/heif.h>
 #include <libexif/exif-data.h> 
 #include <libavformat/avformat.h>
+#include <libavcodec/avcodec.h>
+#include <libswscale/swscale.h>
 #include <png.h>
 #include "compressor.h"
 #include "logger.h"
@@ -42,7 +44,7 @@ bool compress_image(const char* file, const char* output_file)
 		return false;
 	}
 
-	//Libheif compression used for heic files
+	//Libheif compression used for .heic files
 	if (strcmp(extension, ".heic") == 0) {
 		struct heif_context* context = NULL;
 		struct heif_image_handle* handle = NULL;
@@ -50,17 +52,6 @@ bool compress_image(const char* file, const char* output_file)
 		struct heif_image* image = NULL;
 		struct heif_encoder* encoder = NULL;
 
-
-		//const char* const* dirs = heif_get_plugin_directories();
-		//if (!dirs) {
-		//	printf("No plugin directories found.\n");
-		//	return;
-		//}
-		//for (int i = 0; dirs[i]; ++i) {
-		//	printf("libheif plugin dir: %s\n", dirs[i]);
-		//}
-		//heif_free_plugin_directories(dirs);
-		
 		const char* const* dirs = heif_get_plugin_directories();
 		if (dirs) {
 			for (int i = 0; dirs[i]; ++i) {
@@ -136,7 +127,7 @@ bool compress_image(const char* file, const char* output_file)
 
 		return true;
 	}
-	//Libjpeg-turbo compression used for jpg/jpeg files
+	//Libjpeg-turbo compression used for .jpg/.jpeg files
 	else if ((strcasecmp(extension, ".jpg") == 0) || strcasecmp(extension, ".jpeg") == 0){
 		struct jpeg_decompress_struct cinfo;
 		struct jpeg_compress_struct cinfo_out; 
@@ -206,7 +197,7 @@ bool compress_image(const char* file, const char* output_file)
 		fclose(out_file); 
 		return true;
 	}
-	//Libpng compression used for png files
+	//Libpng compression used for .png files
 	else if((strcasecmp(extension, ".png") == 0)){
 		png_structp png_read_ptr = NULL;
 		png_infop read_info_ptr = NULL;
@@ -215,7 +206,7 @@ bool compress_image(const char* file, const char* output_file)
 		unsigned char* image_data = NULL; 
 
 		//Open input file
-		in_file = fopen(file, 'rb'); 
+		in_file = fopen(file, "rb"); 
 		if (!in_file) {
 			log_message(LOG_ERROR, "Failed to open input file %s: %s", file, strerror(errno)); 
 			return false;
@@ -382,22 +373,732 @@ bool compress_image(const char* file, const char* output_file)
 /// @return True if compression successful
 bool compress_video(const char* file, const char* output_file)
 {
-	// Video compression using ffmpeg's command line interface
-	// Uncomment if want to use that instead of manual.It's safer and less error-prone
+	AVFormatContext* in_ctx = NULL;
+	AVFormatContext* out_ctx = NULL;
+	AVPacket* pkt = NULL;
+	AVFrame* frame = NULL;
+	AVFrame* converted_frame = NULL;
+	int* stream_mapping = NULL;
+	AVCodecContext** dec_contexts = NULL;
+	AVCodecContext** enc_contexts = NULL;
+	struct SwsContext** sws_contexts = NULL;
+	int stream_index = 0;
+	bool status = false;
 
-	char cmd[1024];
-	snprintf(cmd, sizeof(cmd), "ffmpeg -i \"%s\" -vcodec h264 \"%s\"", file, output_file);
-	int ret = system(cmd);
-	if (ret != 0) {
-		log_message(LOG_ERROR, "Failed to compress video %s: %d", file, ret);
+	//temp - detailed error logging: 
+	av_log_set_level(AV_LOG_ERROR);
+	av_log_set_callback(ffmpeg_log_callback);
+
+
+	//Process input file
+
+	// Open input file
+	if (avformat_open_input(&in_ctx, file, NULL, NULL) < 0) {
+		log_message(LOG_ERROR, "Failed to open video input %s", file);
 		return false;
 	}
-	return true;
+
+	// Retrieve stream info
+	if (avformat_find_stream_info(in_ctx, NULL) < 0) {
+		log_message(LOG_ERROR, "Failed to find stream info for %s", file);
+		avformat_close_input(&in_ctx);
+		return false;
+	}
+
+	// Allocate output context
+	if (avformat_alloc_output_context2(&out_ctx, NULL, NULL, output_file) < 0) {
+		log_message(LOG_ERROR, "Failed to allocate output context for %s", output_file);
+		avformat_close_input(&in_ctx);
+		return false;
+	}
+
+	// Allocate stream mapping and codec context
+	stream_mapping = (int*)av_calloc(in_ctx->nb_streams, sizeof(int));
+	dec_contexts = (AVCodecContext**)av_calloc(in_ctx->nb_streams, sizeof(AVCodecContext*));
+	enc_contexts = (AVCodecContext**)av_calloc(in_ctx->nb_streams, sizeof(AVCodecContext*));
+	sws_contexts = (struct SwsContext**)av_calloc(in_ctx->nb_streams, sizeof(struct SwsContext*));
+
+	if (!stream_mapping || !dec_contexts || !enc_contexts || !sws_contexts) {
+		log_message(LOG_ERROR, "Failed to allocate stream mapping or codec contexts for %s", file);
+
+		av_free(sws_contexts);
+		av_free(enc_contexts);
+		av_free(dec_contexts);
+		av_free(stream_mapping);
+		avformat_free_context(out_ctx);
+		avformat_close_input(&in_ctx);
+		return false;
+	}
+
+	//Process each input file stream
+	//Video stream is compressed, audio is only copied (processing speed/file size optimization)
+	for (unsigned int i = 0; i < in_ctx->nb_streams; i++) {
+		AVStream* in_stream = in_ctx->streams[i];
+		AVStream* out_stream = avformat_new_stream(out_ctx, NULL);
+
+		if (!out_stream) {
+			log_message(LOG_ERROR, "Failed to create output stream for %s", file);
+
+			for (unsigned int j = 0; j < i; j++) {
+				if (dec_contexts[j]) avcodec_free_context(&dec_contexts[j]);
+				if (enc_contexts[j]) avcodec_free_context(&enc_contexts[j]);
+				if (sws_contexts[j]) sws_freeContext(sws_contexts[j]);
+			}
+
+			av_free(sws_contexts);
+			av_free(enc_contexts);
+			av_free(dec_contexts);
+			av_free(stream_mapping);
+			avformat_free_context(out_ctx);
+			avformat_close_input(&in_ctx);
+			return false;
+		}
+
+		//Map the stream to next output index
+		stream_mapping[i] = stream_index++;
+		
+		//Compress only video
+		if (in_stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+
+			//Decoder
+
+			const AVCodec* dec_codec = avcodec_find_decoder(in_stream->codecpar->codec_id);
+			if (!dec_codec) {
+				log_message(LOG_ERROR, "No decoder found for stream %d in %s", i, file);
+				stream_mapping[i] = -1;
+				continue;
+			}
+
+			dec_contexts[i] = avcodec_alloc_context3(dec_codec);
+			if (!dec_contexts[i]) {
+				log_message(LOG_ERROR, "Failed to allocate decoder context for video stream %d", i);
+				stream_mapping[i] = -1;
+				continue;
+			}
+			if (avcodec_parameters_to_context(dec_contexts[i], in_stream->codecpar) < 0) {
+				log_message(LOG_ERROR, "Failed to copy parameters to decoder context for video stream %d", i);
+				stream_mapping[i] = -1;
+				avcodec_free_context(&dec_contexts[i]);
+				continue;
+			}
+			if (avcodec_open2(dec_contexts[i], dec_codec, NULL) < 0) {
+				log_message(LOG_ERROR, "Failed to open decoder for video stream %d", i);
+				stream_mapping[i] = -1;
+				avcodec_free_context(&dec_contexts[i]);
+				continue;
+			}
+
+			//Encoder
+
+			const AVCodec* enc_codec = avcodec_find_encoder(AV_CODEC_ID_H264);
+			if (!enc_codec) {
+				log_message(LOG_ERROR, "No H.264 encoder found for video stream %d", i);
+				stream_mapping[i] = -1;
+				avcodec_free_context(&dec_contexts[i]);
+				continue;
+			}
+
+			enc_contexts[i] = avcodec_alloc_context3(enc_codec);
+			if (!enc_contexts[i]) {
+				log_message(LOG_ERROR, "Failed to allocate H.264 encoder context for video stream %d", i);
+				stream_mapping[i] = -1;
+				avcodec_free_context(&dec_contexts[i]);
+				continue;
+			}
+
+			// Configure encoder using decoder values and enforce h264_mf requirements
+			enc_contexts[i]->height = dec_contexts[i]->height;
+			enc_contexts[i]->width = dec_contexts[i]->width;
+			enc_contexts[i]->sample_aspect_ratio = dec_contexts[i]->sample_aspect_ratio;
+			enc_contexts[i]->pix_fmt = AV_PIX_FMT_NV12;// h264_mf requires NV12 pixel format
+
+			// Set time base based on guessed frame rate (required by h264_mf)
+			AVRational frame_rate = av_guess_frame_rate(in_ctx, in_ctx->streams[i], NULL);
+			if (frame_rate.num <= 0 || frame_rate.den <= 0) {
+				log_message(LOG_WARNING, "Invalid frame rate for stream %d, using fallback 25/1", i);
+				frame_rate = (AVRational){ 25, 1 }; // Fallback to 25 fps
+			}
+
+			enc_contexts[i]->time_base = av_inv_q(frame_rate);
+			if (enc_contexts[i]->time_base.num <= 0 || enc_contexts[i]->time_base.den <= 0) {
+				log_message(LOG_WARNING, "Invalid time_base for stream %d, using fallback 1/25", i);
+				enc_contexts[i]->time_base = (AVRational){ 1, 25 }; // Fallback
+			}
+
+			// Set nominal frame rate and bitrate (2 Mbps default)
+			enc_contexts[i]->framerate = frame_rate;
+			enc_contexts[i]->bit_rate = dec_contexts[i]->bit_rate ? dec_contexts[i]->bit_rate / 2 : 2000000;
+
+			// Set encoder to use global headers if required by container format
+			if (out_ctx->oformat->flags & AVFMT_GLOBALHEADER) {
+				enc_contexts[i]->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+			}
+
+			// Initialize sws_context for pixel format conversion
+			sws_contexts[i] = sws_getContext(
+				dec_contexts[i]->width, dec_contexts[i]->height, dec_contexts[i]->pix_fmt,
+				enc_contexts[i]->width, enc_contexts[i]->height, enc_contexts[i]->pix_fmt,
+				SWS_BILINEAR, NULL, NULL, NULL);
+			if (!sws_contexts[i]) {
+				log_message(LOG_ERROR, "Failed to initialize sws_context for video stream %d", i);
+				stream_mapping[i] = -1; //Mark stream as invalid
+				avcodec_free_context(&dec_contexts[i]);
+				avcodec_free_context(&enc_contexts[i]);
+				continue;
+			}
+
+			//temp - Log encoder parameters for debugging
+			log_message(LOG_INFO, "Encoder stream %d: w=%d h=%d pix_fmt=%d time_base=%d/%d framerate=%d/%d",
+				i, enc_contexts[i]->width, enc_contexts[i]->height, enc_contexts[i]->pix_fmt,
+				enc_contexts[i]->time_base.num, enc_contexts[i]->time_base.den,
+				enc_contexts[i]->framerate.num, enc_contexts[i]->framerate.den);
+
+			if (avcodec_open2(enc_contexts[i], enc_codec, NULL) < 0) {
+				char err_buf[128];
+				av_strerror(avcodec_open2(enc_contexts[i], enc_codec, NULL), err_buf, sizeof(err_buf));				
+				log_message(LOG_ERROR, "Failed to open H.264 encoder for video stream %d: %s", i, err_buf);
+				
+				stream_mapping[i] = -1; //Mark stream as invalid
+				avcodec_free_context(&dec_contexts[i]);
+				avcodec_free_context(&enc_contexts[i]);
+				sws_freeContext(sws_contexts[i]);
+				continue;
+			}
+
+			if (avcodec_parameters_from_context(out_stream->codecpar, enc_contexts[i]) < 0) {
+				log_message(LOG_ERROR, "Failed to copy encoder parameters to output stream %d", i);
+				stream_mapping[i] = -1;
+				avcodec_free_context(&dec_contexts[i]);
+				avcodec_free_context(&enc_contexts[i]);
+				sws_freeContext(sws_contexts[i]);
+				continue;
+			}
+
+			out_stream->time_base = enc_contexts[i]->time_base;
+		}
+		//Copy audio and other streams
+		else {
+			if (avcodec_parameters_copy(out_stream->codecpar, in_stream->codecpar) < 0) {
+				log_message(LOG_ERROR, "Failed to copy stream parameters for stream %d", i);
+				stream_mapping[i] = -1;
+				continue;
+			}
+			out_stream->time_base = in_stream->time_base;
+		}
+	}
+	
+	//Process output file
+
+	//Open output file
+	//Ceck agains AVFMT_NOFILE bitmask if format needs a file (not in-memory format)
+	if (!(out_ctx->oformat->flags & AVFMT_NOFILE)) {
+		if (avio_open(&out_ctx->pb, output_file, AVIO_FLAG_WRITE) < 0) {
+			log_message(LOG_ERROR, "Failed to open output file %s", output_file);
+
+			for (unsigned int i = 0; i < in_ctx->nb_streams; i++) {
+				if (dec_contexts[i]) avcodec_free_context(&dec_contexts[i]);
+				if (enc_contexts[i]) avcodec_free_context(&enc_contexts[i]);
+				if (sws_contexts[i]) sws_freeContext(sws_contexts[i]);
+			}
+
+			av_free(sws_contexts);
+			av_free(enc_contexts);
+			av_free(dec_contexts);
+			av_free(stream_mapping);
+			avformat_free_context(out_ctx);
+			avformat_close_input(&in_ctx);
+
+			return false;
+		}
+	}
+
+	// Write header
+	if (avformat_write_header(out_ctx, NULL) < 0) {
+		log_message(LOG_ERROR, "Failed to write header for %s", output_file);
+
+		if (!(out_ctx->oformat->flags & AVFMT_NOFILE)) avio_closep(&out_ctx->pb);
+
+		for (unsigned int i = 0; i < in_ctx->nb_streams; i++) {
+			if (dec_contexts[i]) avcodec_free_context(&dec_contexts[i]);
+			if (enc_contexts[i]) avcodec_free_context(&enc_contexts[i]);
+			if (sws_contexts[i]) sws_freeContext(sws_contexts[i]);
+		}
+
+		av_free(sws_contexts);
+		av_free(enc_contexts);
+		av_free(dec_contexts);
+		av_free(stream_mapping);
+		avformat_free_context(out_ctx);
+		avformat_close_input(&in_ctx);
+
+		return false;
+	}
+
+	// Allocate packet and frame
+	pkt = av_packet_alloc();
+	if (!pkt) {
+		log_message(LOG_ERROR, "Failed to allocate packet for %s", output_file);
+
+		if (!(out_ctx->oformat->flags & AVFMT_NOFILE)) avio_closep(&out_ctx->pb);
+
+		for (unsigned int i = 0; i < in_ctx->nb_streams; i++) {
+			if (dec_contexts[i]) avcodec_free_context(&dec_contexts[i]);
+			if (enc_contexts[i]) avcodec_free_context(&enc_contexts[i]);
+			if (sws_contexts[i]) sws_freeContext(sws_contexts[i]);
+		}
+
+		av_free(sws_contexts);
+		av_free(enc_contexts);
+		av_free(dec_contexts);
+		av_free(stream_mapping);
+		avformat_free_context(out_ctx);
+		avformat_close_input(&in_ctx);
+
+		return false;
+	}
+
+	frame = av_frame_alloc();
+	if (!frame) {
+		log_message(LOG_ERROR, "Failed to allocate frame for %s", output_file);
+
+		av_packet_free(&pkt);
+
+		if (!(out_ctx->oformat->flags & AVFMT_NOFILE)) avio_closep(&out_ctx->pb);
+
+		for (unsigned int i = 0; i < in_ctx->nb_streams; i++) {
+			if (dec_contexts[i]) avcodec_free_context(&dec_contexts[i]);
+			if (enc_contexts[i]) avcodec_free_context(&enc_contexts[i]);
+			if (sws_contexts[i]) sws_freeContext(sws_contexts[i]);
+		}
+
+		av_free(sws_contexts);
+		av_free(enc_contexts);
+		av_free(dec_contexts);
+		av_free(stream_mapping);
+		avformat_free_context(out_ctx);
+		avformat_close_input(&in_ctx);
+		
+		return false;
+	}
+
+	//Allocate converted_frame (holds converted pixel data for encoding)
+	converted_frame = av_frame_alloc(); 
+	if (!converted_frame) {
+		log_message(LOG_ERROR, "Failed to allocate converted frame for %s", output_file);
+		av_packet_free(&pkt);
+		av_frame_free(&frame);
+
+		if (!(out_ctx->oformat->flags & AVFMT_NOFILE)) avio_closep(&out_ctx->pb);
+
+		for (unsigned int i = 0; i < in_ctx->nb_streams; i++) {
+			if (dec_contexts[i]) avcodec_free_context(&dec_contexts[i]);
+			if (enc_contexts[i]) avcodec_free_context(&enc_contexts[i]);
+			if (sws_contexts[i]) sws_freeContext(sws_contexts[i]);
+		}
+
+		av_free(sws_contexts);
+		av_free(enc_contexts);
+		av_free(dec_contexts);
+		av_free(stream_mapping);
+		avformat_free_context(out_ctx);
+		avformat_close_input(&in_ctx);
+		return false;
+	}
+
+	// Process packets
+	while (av_read_frame(in_ctx, pkt) >= 0) {
+
+		//Unref packet if stream is not to be processed 
+		if (stream_mapping[pkt->stream_index] < 0) {
+			av_packet_unref(pkt);
+			continue;
+		}
+
+		AVStream* in_stream = in_ctx->streams[pkt->stream_index];
+		AVStream* out_stream = out_ctx->streams[stream_mapping[pkt->stream_index]];
+
+		//Process only video
+		if (in_stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+
+			if (!dec_contexts[pkt->stream_index] || !enc_contexts[pkt->stream_index] || !sws_contexts[pkt->stream_index]) {
+				log_message(LOG_ERROR, "No codec context available for video stream %d", pkt->stream_index);
+				av_packet_unref(pkt);
+				continue;
+			}
+
+			//Send packed to decoder
+			//logs for specific decoder error
+			int ret = avcodec_send_packet(dec_contexts[pkt->stream_index], pkt);
+			if (ret < 0) {
+				char err_buf[128];
+				av_strerror(ret, err_buf, sizeof(err_buf));
+				log_message(LOG_ERROR, "Failed to send packet to decoder for stream %d: %s", pkt->stream_index, err_buf);
+				av_packet_unref(pkt);
+				continue;
+			}
+
+			//Read decoded frames 
+			while (avcodec_receive_frame(dec_contexts[pkt->stream_index], frame) >= 0) {
+				
+				//temp - log frame parameters
+				log_message(LOG_INFO, "Frame: w=%d h=%d fmt=%d", frame->width, frame->height, frame->format);
+
+				//temp - validate frame parameters
+				if (frame->width <= 0 || frame->height <= 0 || frame->format == AV_PIX_FMT_NONE) {
+					log_message(LOG_ERROR, "Invalid frame parameters for stream %d", pkt->stream_index);
+					av_frame_unref(frame);
+					continue;
+				}
+
+				// convert pixel format to NV12
+				converted_frame->width = frame->width;
+				converted_frame->height = frame->height;
+				converted_frame->format = enc_contexts[pkt->stream_index]->pix_fmt;
+				if (av_frame_get_buffer(converted_frame, 0) < 0) {
+					log_message(LOG_ERROR, "Failed to allocate buffer for converted frame");
+					av_frame_unref(frame);
+					continue;
+				}
+				if (sws_scale(sws_contexts[pkt->stream_index], frame->data, frame->linesize, 0, frame->height,
+					converted_frame->data, converted_frame->linesize) <= 0) {
+					log_message(LOG_ERROR, "Failed to convert frame for stream %d", pkt->stream_index);
+					av_frame_unref(converted_frame);
+					av_frame_unref(frame);
+					continue;
+				}
+
+				converted_frame->pts = frame->pts;
+
+				AVPacket* out_pkt = av_packet_alloc();
+				if (!out_pkt) {
+					log_message(LOG_ERROR, "Failed to allocate output packet");
+					av_frame_unref(frame);
+					continue;
+				}
+
+				//if (avcodec_send_frame(enc_contexts[pkt->stream_index], frame) < 0 || avcodec_receive_packet(enc_contexts[pkt->stream_index], out_pkt) < 0) {
+				//	log_message(LOG_ERROR, "Failed to encode frame for stream %d", pkt->stream_index);
+				//	av_packet_free(&out_pkt);
+				//	av_frame_unref(frame);
+				//	continue;
+				//}
+
+				////Rescale timestamps, making sure streams stay in sync 
+				//out_pkt->pts = av_rescale_q_rnd(out_pkt->pts, in_stream->time_base, out_stream->time_base, AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX);
+				//out_pkt->dts = av_rescale_q_rnd(out_pkt->dts, in_stream->time_base, out_stream->time_base, AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX);
+				//out_pkt->duration = av_rescale_q(out_pkt->duration, in_stream->time_base, out_stream->time_base);
+				//out_pkt->pos = -1;
+				//out_pkt->stream_index = stream_mapping[pkt->stream_index];
+
+				////Write compressed packet to output file 
+				//if (av_interleaved_write_frame(out_ctx, out_pkt) < 0) {
+				//	log_message(LOG_ERROR, "Error writing encoded frame to %s", output_file);
+				//	av_packet_free(&out_pkt);
+				//	av_frame_unref(frame);
+				//	continue;
+				//}
+
+				// Send the converted frame to the encoder.
+				// If sending fails, log the error and clean up resources
+				ret = avcodec_send_frame(enc_contexts[pkt->stream_index], converted_frame);
+				if (ret < 0) {
+					char err_buf[128];
+					av_strerror(ret, err_buf, sizeof(err_buf));
+					log_message(LOG_ERROR, "Failed to send frame to encoder for stream %d: %s", pkt->stream_index, err_buf);
+
+					av_packet_free(&out_pkt);
+					av_frame_unref(converted_frame);
+					av_frame_unref(frame);
+					continue;
+				}
+
+				// Receive encoded packets from the encoder and write them to the output.
+				// Handles EAGAIN (need more input), EOF (encoder flushed), and other errors.
+				// Rescales timestamps and stream index before writing the packet.
+				while (true) {
+					ret = avcodec_receive_packet(enc_contexts[pkt->stream_index], out_pkt);
+					if (ret == AVERROR(EAGAIN)) {
+						break; // Need more frames
+					}
+					else if (ret == AVERROR_EOF) {
+						log_message(LOG_WARNING, "Encoder for stream %d is flushed", pkt->stream_index);
+						break; // No more packets
+					}
+					else if (ret < 0) {
+						char err_buf[128];
+						av_strerror(ret, err_buf, sizeof(err_buf));
+						log_message(LOG_ERROR, "Failed to receive packet from encoder for stream %d: %s", pkt->stream_index, err_buf);
+						av_packet_free(&out_pkt);
+						av_frame_unref(converted_frame);
+						av_frame_unref(frame);
+						break;
+					}
+
+					out_pkt->pts = av_rescale_q_rnd(out_pkt->pts, in_stream->time_base, out_stream->time_base, AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX);
+					out_pkt->dts = av_rescale_q_rnd(out_pkt->dts, in_stream->time_base, out_stream->time_base, AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX);
+					out_pkt->duration = av_rescale_q(out_pkt->duration, in_stream->time_base, out_stream->time_base);
+					out_pkt->pos = -1;
+					out_pkt->stream_index = stream_mapping[pkt->stream_index];
+
+					if (av_interleaved_write_frame(out_ctx, out_pkt) < 0) {
+						log_message(LOG_ERROR, "Error writing encoded frame to %s", output_file);
+
+						av_packet_free(&out_pkt);
+						av_frame_unref(converted_frame);
+						av_frame_unref(frame);
+						break;
+					}
+
+					av_packet_unref(out_pkt);
+				}
+
+				av_packet_free(&out_pkt);
+				av_frame_unref(converted_frame);
+				av_frame_unref(frame);
+			}
+		} else {
+			//Rescale audio timestamps 
+			pkt->pts = av_rescale_q_rnd(pkt->pts, in_stream->time_base, out_stream->time_base, AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX);
+			pkt->dts = av_rescale_q_rnd(pkt->dts, in_stream->time_base, out_stream->time_base, AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX);
+			pkt->duration = av_rescale_q(pkt->duration, in_stream->time_base, out_stream->time_base);
+			pkt->pos = -1;
+			pkt->stream_index = stream_mapping[pkt->stream_index];
+
+			//Write packets to output file
+			if (av_interleaved_write_frame(out_ctx, pkt) < 0) {
+				log_message(LOG_ERROR, "Error writing frame to %s", output_file);
+				av_packet_unref(pkt);
+				av_packet_free(&pkt);
+				av_frame_free(&frame);
+				av_frame_free(&converted_frame);
+
+				if (!(out_ctx->oformat->flags & AVFMT_NOFILE)) avio_closep(&out_ctx->pb);
+
+				for (unsigned int i = 0; i < in_ctx->nb_streams; i++) {
+					if (dec_contexts[i]) avcodec_free_context(&dec_contexts[i]);
+					if (enc_contexts[i]) avcodec_free_context(&enc_contexts[i]);
+					if (sws_contexts[i]) sws_freeContext(sws_contexts[i]);
+				}
+
+				av_free(sws_contexts);
+				av_free(enc_contexts);
+				av_free(dec_contexts);
+				av_free(stream_mapping);
+				avformat_free_context(out_ctx);
+				avformat_close_input(&in_ctx);
+
+				return false;
+			}
+		}
+		av_packet_unref(pkt);
+	}
+
+	// Flush decoders and encoders
+
+	for (unsigned int i = 0; i < in_ctx->nb_streams; i++) {
+		if (stream_mapping[i] < 0 || !dec_contexts[i] || !enc_contexts[i]) continue;
+
+		// Flush decoder
+
+		if (avcodec_send_packet(dec_contexts[i], NULL) < 0) {
+			log_message(LOG_ERROR, "Failed to flush decoder for stream %d", i);
+			continue;
+		}
+
+		while (avcodec_receive_frame(dec_contexts[i], frame) >= 0) {
+
+			// temp - Log frame parameters
+			log_message(LOG_INFO, "Flushed Frame: w=%d h=%d fmt=%d", frame->width, frame->height, frame->format);
+
+			// temp - Validate frame parameters
+			if (frame->width <= 0 || frame->height <= 0 || frame->format == AV_PIX_FMT_NONE) {
+				log_message(LOG_ERROR, "Invalid flushed frame parameters for stream %d", i);
+				av_frame_unref(frame);
+				continue;
+			}
+
+			// temp - Convert pixel format for flushed frames
+			converted_frame->width = frame->width;
+			converted_frame->height = frame->height;
+			converted_frame->format = enc_contexts[i]->pix_fmt;
+			if (av_frame_get_buffer(converted_frame, 0) < 0) {
+				log_message(LOG_ERROR, "Failed to allocate buffer for converted flushed frame");
+				av_frame_unref(frame);
+				continue;
+			}
+			if (sws_scale(sws_contexts[i], frame->data, frame->linesize, 0, frame->height,
+				converted_frame->data, converted_frame->linesize) <= 0) {
+				log_message(LOG_ERROR, "Failed to convert flushed frame for stream %d", i);
+				av_frame_unref(converted_frame);
+				av_frame_unref(frame);
+				continue;
+			}
+
+			converted_frame->pts = frame->pts;
+
+			AVPacket* out_pkt = av_packet_alloc();
+			if (!out_pkt) {
+				log_message(LOG_ERROR, "Failed to allocate output packet for flush");
+				av_frame_unref(frame);
+				continue;
+			}
 
 
+			/*if (avcodec_send_frame(enc_contexts[i], frame) < 0 ||
+				avcodec_receive_packet(enc_contexts[i], out_pkt) < 0) {
+				log_message(LOG_ERROR, "Failed to encode flushed frame for stream %d", i);
+				av_packet_free(&out_pkt);
+				av_frame_unref(frame);
+				continue;
+			}
+
+			AVStream* in_stream = in_ctx->streams[i];
+			AVStream* out_stream = out_ctx->streams[stream_mapping[i]];
+			out_pkt->pts = av_rescale_q_rnd(out_pkt->pts, in_stream->time_base, out_stream->time_base, AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX);
+			out_pkt->dts = av_rescale_q_rnd(out_pkt->dts, in_stream->time_base, out_stream->time_base, AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX);
+			out_pkt->duration = av_rescale_q(out_pkt->duration, in_stream->time_base, out_stream->time_base);
+			out_pkt->pos = -1;
+			out_pkt->stream_index = stream_mapping[i];
+
+			if (av_interleaved_write_frame(out_ctx, out_pkt) < 0) {
+				log_message(LOG_ERROR, "Error writing flushed frame to %s", output_file);
+				av_packet_free(&out_pkt);
+				av_frame_unref(frame);
+				continue;
+			}*/
 
 
-	return false;
+			// Flush encoder by sending a null frame (converted_frame reused here).
+			// Continue with the next stream if flushing fails.
+			int ret = avcodec_send_frame(enc_contexts[i], converted_frame);
+			if (ret < 0) {
+				char err_buf[128];
+				av_strerror(ret, err_buf, sizeof(err_buf));
+				log_message(LOG_ERROR, "Failed to send flushed frame to encoder for stream %d: %s", i, err_buf);
+				av_packet_free(&out_pkt);
+				av_frame_unref(converted_frame);
+				av_frame_unref(frame);
+				continue;
+			}
+
+			while (true) {
+				ret = avcodec_receive_packet(enc_contexts[i], out_pkt);
+				if (ret == AVERROR(EAGAIN)) {
+					break; // Need more frames
+				}
+				else if (ret == AVERROR_EOF) {
+					log_message(LOG_WARNING, "Encoder for stream %d is flushed", i);
+					break; // No more packets
+				}
+				else if (ret < 0) {
+					char err_buf[128];
+					av_strerror(ret, err_buf, sizeof(err_buf));
+					log_message(LOG_ERROR, "Failed to receive flushed packet for stream %d: %s", i, err_buf);
+					av_packet_free(&out_pkt);
+					av_frame_unref(converted_frame);
+					av_frame_unref(frame);
+					break;
+				}
+
+				AVStream* in_stream = in_ctx->streams[i];
+				AVStream* out_stream = out_ctx->streams[stream_mapping[i]];
+				out_pkt->pts = av_rescale_q_rnd(out_pkt->pts, in_stream->time_base, out_stream->time_base, AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX);
+				out_pkt->dts = av_rescale_q_rnd(out_pkt->dts, in_stream->time_base, out_stream->time_base, AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX);
+				out_pkt->duration = av_rescale_q(out_pkt->duration, in_stream->time_base, out_stream->time_base);
+				out_pkt->pos = -1;
+				out_pkt->stream_index = stream_mapping[i];
+
+				if (av_interleaved_write_frame(out_ctx, out_pkt) < 0) {
+					log_message(LOG_ERROR, "Error writing flushed frame to %s", output_file);
+					av_packet_free(&out_pkt);
+					av_frame_unref(converted_frame);
+					av_frame_unref(frame);
+					break;
+				}
+
+				av_packet_unref(out_pkt);
+			}
+
+			av_packet_free(&out_pkt);
+			av_frame_unref(converted_frame);
+			av_frame_unref(frame);
+		}
+
+		// Flush encoder
+
+		if (avcodec_send_frame(enc_contexts[i], NULL) < 0) {
+			log_message(LOG_ERROR, "Failed to flush encoder for stream %d", i);
+			continue;
+		}
+
+		while (avcodec_receive_packet(enc_contexts[i], pkt) >= 0) {
+			AVStream* in_stream = in_ctx->streams[i];
+			AVStream* out_stream = out_ctx->streams[stream_mapping[i]];
+			pkt->pts = av_rescale_q_rnd(pkt->pts, in_stream->time_base, out_stream->time_base, AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX);
+			pkt->dts = av_rescale_q_rnd(pkt->dts, in_stream->time_base, out_stream->time_base, AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX);
+			pkt->duration = av_rescale_q(pkt->duration, in_stream->time_base, out_stream->time_base);
+			pkt->pos = -1;
+			pkt->stream_index = stream_mapping[i];
+
+			if (av_interleaved_write_frame(out_ctx, pkt) < 0) {
+				log_message(LOG_ERROR, "Error writing flushed packet to %s", output_file);
+				av_packet_unref(pkt);
+				continue;
+			}
+
+			av_packet_unref(pkt);
+		}
+	}
+
+	// Write final metadata chunk 
+	if (av_write_trailer(out_ctx) < 0) {
+		log_message(LOG_ERROR, "Failed to write trailer for %s", output_file);
+
+		av_packet_free(&pkt);
+		av_frame_free(&frame);
+		av_frame_free(&converted_frame);
+
+		if (!(out_ctx->oformat->flags & AVFMT_NOFILE)) avio_closep(&out_ctx->pb);
+
+		for (unsigned int i = 0; i < in_ctx->nb_streams; i++) {
+			if (dec_contexts[i]) avcodec_free_context(&dec_contexts[i]);
+			if (enc_contexts[i]) avcodec_free_context(&enc_contexts[i]);
+			if (sws_contexts[i]) sws_freeContext(sws_contexts[i]);
+		}
+
+		av_free(sws_contexts);
+		av_free(enc_contexts);
+		av_free(dec_contexts);
+		av_free(stream_mapping);
+		avformat_free_context(out_ctx);
+		avformat_close_input(&in_ctx);
+		return false;
+	}
+
+	status = true; 
+	log_message(LOG_INFO, "Successfully compressed video %s", file);
+
+	// Cleanup
+	av_packet_free(&pkt);
+	av_frame_free(&frame);
+	av_frame_free(&converted_frame);
+
+	if (!(out_ctx->oformat->flags & AVFMT_NOFILE)) avio_closep(&out_ctx->pb);
+
+	for (unsigned int i = 0; i < in_ctx->nb_streams; i++) {
+		if (dec_contexts[i]) avcodec_free_context(&dec_contexts[i]);
+		if (enc_contexts[i]) avcodec_free_context(&enc_contexts[i]);
+		if (sws_contexts[i]) sws_freeContext(sws_contexts[i]);
+	}
+
+	av_free(sws_contexts);
+	av_free(enc_contexts);
+	av_free(dec_contexts);
+	av_free(stream_mapping);
+	avformat_free_context(out_ctx);
+	avformat_close_input(&in_ctx);
+
+	return status;
 }
 
 /// @brief Create folder if needed and copy compressed file to the destination

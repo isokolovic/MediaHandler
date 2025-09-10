@@ -36,6 +36,7 @@ void log_message(LogLevel level, const char* format, ...){
         case LOG_INFO: level_str = "INFO"; break; 
         case LOG_WARNING: level_str = "WARNING"; break;
         case LOG_ERROR: level_str = "ERROR"; break;
+        case LOG_DEBUG: level_str = "DEBUG"; break;
         default: level_str = "UNKNOWN"; break;
     }
 

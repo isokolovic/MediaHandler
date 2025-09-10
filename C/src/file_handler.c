@@ -55,7 +55,7 @@ bool is_directory(const char* path){
 bool is_image(const char* filename) {
     const char* extension = strrchr(filename, '.');
     if (!extension) return false;
-    for (size_t i = 0; sizeof(image_extensions) / sizeof(image_extensions[0]); i++) {
+    for (size_t i = 0; i < sizeof(image_extensions) / sizeof(image_extensions[0]); i++) {
         if (strcasecmp(extension, image_extensions[i]) == 0) return true;
     }
     return false;
@@ -67,7 +67,7 @@ bool is_image(const char* filename) {
 bool is_video(const char* filename) {
     const char* extension = strrchr(filename, '.');
     if (!extension) return false;
-    for (size_t i = 0; sizeof(video_extensions) / sizeof(video_extensions[0]); i++) {
+    for (size_t i = 0; i < sizeof(video_extensions) / sizeof(video_extensions[0]); i++) {
         if (strcasecmp(extension, video_extensions[i]) == 0) return true;
     }
     return false;
@@ -79,7 +79,7 @@ bool is_video(const char* filename) {
 bool is_gif_misc(const char* filename) {
     const char* extension = strrchr(filename, '.');
     if (!extension) return false;
-    for (size_t i = 0; sizeof(other_extensions) / sizeof(other_extensions[0]); i++) {
+    for (size_t i = 0; i < sizeof(other_extensions) / sizeof(other_extensions[0]); i++) {
         if (strcasecmp(extension, other_extensions[i]) == 0) return true;
     }
     return false;

@@ -63,14 +63,17 @@ int main(void){
     char source_folder[1024];
     char destination_folder[1024];
 
-    if (get_valid_directory("Enter the path to the source folder: ", source_folder, sizeof(source_folder)) != 0) {
-        close_logger();
-        return 1;
-    }
-    if (get_valid_directory("Enter the path to the destination folder: ", destination_folder, sizeof(destination_folder)) != 0) {
-        close_logger();
-        return 1;
-    }
+    //if (get_valid_directory("Enter the path to the source folder: ", source_folder, sizeof(source_folder)) != 0) {
+    //    close_logger();
+    //    return 1;
+    //}
+    //if (get_valid_directory("Enter the path to the destination folder: ", destination_folder, sizeof(destination_folder)) != 0) {
+    //    close_logger();
+    //    return 1;
+    //}
+
+    strcpy(source_folder, "C:\\Users\\isoko\\Desktop\\New folder\\S");
+    strcpy(destination_folder, "C:\\Users\\isoko\\Desktop\\New folder\\D");
 
     run_media_migration(source_folder, source_folder, destination_folder); 
     close_logger(); 
