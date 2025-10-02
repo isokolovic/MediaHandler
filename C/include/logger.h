@@ -2,6 +2,7 @@
 
 #ifndef LOG_H
 #define LOG_H
+//Log levels
 typedef enum{
     LOG_INFO,
     LOG_WARNING,
@@ -11,7 +12,8 @@ typedef enum{
 
 void init_logger(const char* filename); 
 void log_message(LogLevel level, const char* format, ...); 
-void close_logger(void); 
+void close_logger(void);
+void log_file_processing(const char* file_path, int success);
 
 /// @brief Function to capture errors during video compression
 static void ffmpeg_log_callback(void* ptr, int level, const char* fmt, va_list vl) {
@@ -21,4 +23,5 @@ static void ffmpeg_log_callback(void* ptr, int level, const char* fmt, va_list v
         log_message(LOG_ERROR, "FFmpeg: %s", buf);
     }
 }
+
 #endif

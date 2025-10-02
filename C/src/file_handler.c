@@ -359,20 +359,22 @@ bool is_file_type_valid(const char* filename) {
 bool compress_file(const char* file, const char* output_file) {
     const char* extension = strrchr(file, '.');
 
+    bool status = false; //File processing status
+
     if (!file || !output_file) {
-        log_message(LOG_ERROR, "Null input or output path in compress_file");
-        return false;
+        log_message(LOG_ERROR, "Null input or output path in compress_file");                
     }
     if (!extension) {
-        log_message(LOG_ERROR, "No extension found for %s", file);
-        return false;
+        log_message(LOG_ERROR, "No extension found for %s", file);        
     }
     if (is_image(file)) {
-        return compress_image(file, output_file, extension);
+        status = compress_image(file, output_file, extension);        
     }
     if (is_video(file)) {
-        return compress_video(file, output_file);
+        status = compress_video(file, output_file);
     }
+    log_file_processing(file, status); 
+    return status;
 }
 
 /// @brief Create folder if needed and copy compressed file to the destination
