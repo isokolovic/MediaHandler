@@ -381,7 +381,7 @@ bool compress_file(const char* file, const char* output_file) {
 /// @param root Root folder 
 /// @param destination_folder Destination folder
 /// @param file File to bo processed
-void create_folder_process_file(const char* source_folder, const char* destination_folder, const char* filename)
+bool create_folder_process_file(const char* source_folder, const char* destination_folder, const char* filename)
 {
     if (!source_folder || !destination_folder || !filename) {
         log_message(LOG_ERROR, "NULL parameter in create_folder_process_file");
@@ -491,5 +491,5 @@ void create_folder_process_file(const char* source_folder, const char* destinati
     }
 
     //Compress the file copy
-    bool compressed = compress_file(filename, temp_file);
+    return compress_file(filename, temp_file);
 }
