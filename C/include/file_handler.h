@@ -21,4 +21,7 @@ char* clean_name(const char* element_name, bool is_directory);
 char* extract_relative_dir(const char* source_path, const char* file_path);
 long get_file_size(const char* path);
 
+void create_folder_process_file(const char* source_folder, const char* destination_folder, const char* filename);
+bool compress_file(const char* file, const char* output_file);
+
 #endif

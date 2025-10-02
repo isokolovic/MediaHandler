@@ -9,7 +9,8 @@ add_executable(media_migration
     src/main.c
     src/file_handler.c
     src/logger.c
-    src/compressor.c
+    src/image_compressor.c
+    src/video_compressor.c
 )
 
 # 📂 Include directories
