@@ -8,12 +8,12 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
 - **Python**: Easy to use and modify.  
 - **C**: Optimized for speed and large-scale processing.
 
-** Example Usage (both versions):** 
+**Example Usage (both versions):** 
 
 - Specify the source and destination directories as command-line arguments.  
 - The tool compresses multimedia files (from source folder) and recreates the folder structure at the destination.
 
-** Modes:** 
+**Modes:** 
 
 - Retry Mode: run via cmd with additional `-r` argument to retry compression for failed files (e.g. .\media_migration.exe -r).
 - Organize Mode: run via cmd with additional `-o` argument to sort files into folders by creation year.
@@ -56,11 +56,11 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
 
 ### Setup Instructions
 
-1. ** Install Build Tools**:  
+1. **Install Build Tools**:  
    - **Windows** : Install [CMake](https://cmake.org/download/) and [Ninja](https://ninja-build.org/). Add to PATH.  
    - **Linux** : Run `sudo apt update && sudo apt install cmake ninja-build git`.
 
-2. ** Install Dependencies**:  
+2. **Install Dependencies**:  
    - **Windows** : Use `vcpkg` to install libraries, as `libexif` and `ffmpeg` lack full native support on Windows, requiring a dependency manager for prebuilt libraries:  
      - Install `vcpkg`:  
        ```cmd
@@ -85,7 +85,7 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
      sudo apt install libjpeg-dev libheif-dev libexif-dev libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libpng-dev
      ```
 
-3. ** Build and Run**:  
+3. **Build and Run**:  
    - Save the C source files
    - In a terminal, navigate to the project folder:  
      ```bash
