@@ -107,5 +107,5 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
        cmake --build .
        ```  
    - Run the executable:  
-     - **Windows** : `.\media_migration.exe C:\source C:\dest` (add -r or -o for modes)  
-     - **Linux** : `./media_migration /source /dest` (add -r or -o for modes)
+     - **Windows** : `.\media_migration.exe C:\source C:\dest` (add `-r` or `-o` for modes)  
+     - **Linux** : `./media_migration /source /dest` (add `-r` or `-o` for modes)
