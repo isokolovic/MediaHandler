@@ -60,10 +60,10 @@ bool write_packet(AVFormatContext* out_ctx, AVPacket* pkt, AVStream* in_stream, 
 /// @return True if the frame was processed successfully
 bool process_video_frame(VideoCompressionContext* ctx, const char* filename, int stream_index)
 {
-	//temp - log frame parameters
-	log_message(LOG_INFO, "Frame: w=%d h=%d fmt=%d", ctx->frame->width, ctx->frame->height, ctx->frame->format);
+	//======Uncomment for detailed error logging (log frame parameters)======
+	//log_message(LOG_INFO, "Frame: w=%d h=%d fmt=%d", ctx->frame->width, ctx->frame->height, ctx->frame->format);
 
-	//temp - validate frame parameters
+	//Validate frame parameters
 	if (ctx->frame->width <= 0 || ctx->frame->height <= 0 || ctx->frame->format == AV_PIX_FMT_NONE) {
 		log_message(LOG_ERROR, "Invalid frame parameters for stream %d", stream_index);
 		av_frame_unref(ctx->frame);
@@ -168,10 +168,9 @@ bool compress_video(const char* file, const char* output_file) {
 	VideoCompressionContext ctx = { 0 };
 	bool status = false;
 
-	//temp - detailed error logging: 
-	av_log_set_level(AV_LOG_ERROR);
-	av_log_set_callback(ffmpeg_log_callback);
-
+	//======Uncomment for detailed error logging======
+	//av_log_set_level(AV_LOG_ERROR);
+	//av_log_set_callback(ffmpeg_log_callback);
 
 	//Process input file
 
@@ -321,11 +320,11 @@ bool compress_video(const char* file, const char* output_file) {
 				continue;
 			}
 
-			//temp - Log encoder parameters for debugging
-			log_message(LOG_INFO, "Encoder stream %d: w=%d h=%d pix_fmt=%d time_base=%d/%d framerate=%d/%d",
-				i, ctx.enc_contexts[i]->width, ctx.enc_contexts[i]->height, ctx.enc_contexts[i]->pix_fmt,
-				ctx.enc_contexts[i]->time_base.num, ctx.enc_contexts[i]->time_base.den,
-				ctx.enc_contexts[i]->framerate.num, ctx.enc_contexts[i]->framerate.den);
+			//======Uncomment for detailed error logging (Log encoder parameters for debugging)======
+			//log_message(LOG_INFO, "Encoder stream %d: w=%d h=%d pix_fmt=%d time_base=%d/%d framerate=%d/%d",
+			//	i, ctx.enc_contexts[i]->width, ctx.enc_contexts[i]->height, ctx.enc_contexts[i]->pix_fmt,
+			//	ctx.enc_contexts[i]->time_base.num, ctx.enc_contexts[i]->time_base.den,
+			//	ctx.enc_contexts[i]->framerate.num, ctx.enc_contexts[i]->framerate.den);
 
 			int ret_enc = avcodec_open2(ctx.enc_contexts[i], enc_codec, NULL);
 			if (ret_enc < 0) {
@@ -461,17 +460,17 @@ bool compress_video(const char* file, const char* output_file) {
 
 		while (avcodec_receive_frame(ctx.dec_contexts[i], ctx.frame) >= 0) {
 
-			// temp - Log frame parameters
+			//======Uncomment for detailed error logging (log frame parameters)======
 			log_message(LOG_INFO, "Flushed Frame: w=%d h=%d fmt=%d", ctx.frame->width, ctx.frame->height, ctx.frame->format);
 
-			// temp - Validate frame parameters
+			// Validate frame parameters
 			if (ctx.frame->width <= 0 || ctx.frame->height <= 0 || ctx.frame->format == AV_PIX_FMT_NONE) {
 				log_message(LOG_ERROR, "Invalid flushed frame parameters for stream %d", i);
 				av_frame_unref(ctx.frame);
 				continue;
 			}
 
-			// temp - Convert pixel format for flushed frames
+			// Convert pixel format for flushed frames
 			ctx.converted_frame->width = ctx.frame->width;
 			ctx.converted_frame->height = ctx.frame->height;
 			ctx.converted_frame->format = ctx.enc_contexts[i]->pix_fmt;

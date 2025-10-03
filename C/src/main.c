@@ -115,11 +115,12 @@ int main(int argc, char* argv[]) {
             log_message(LOG_WARNING, "No failed files found in " LOG_FILE);
         }
     }
+    else if (organize_mode) {
+        organize_files(source_folder, source_folder, destination_folder, &processed, &failed);
+    }
     else {
         run_media_migration(source_folder, source_folder, destination_folder, &processed, &failed); 
     }
-
-    //Organize mode
 
     close_logger();
     log_summary(processed, failed);
