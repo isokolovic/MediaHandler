@@ -15,8 +15,8 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
 
 **Modes:** 
 
-- Retry Mode: run via cmd with additional `-r` argument to retry compression for failed files (e.g. .\media_migration.exe -r).
-- Organize Mode: run via cmd with additional `-o` argument to sort files into folders by creation year.
+- **Retry Mode:** run via cmd with additional `-r` argument to retry compression for failed files (e.g. .\media_migration.exe -r).
+- **Organize Mode:** run via cmd with additional `-o` argument to sort files into folders by creation year.
 
 ---
 
@@ -34,7 +34,7 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
      pip install Pillow pillow-heif
      ```  
    - Install `ffmpeg`:  
-     - **Windows**: Download from [ffmpeg.org](https://ffmpeg.org/download.html), extract, and add to PATH (e.g., `C:\ffmpeg\bin`).  
+     - **Windows**: Download from [ffmpeg.org](https://ffmpeg.org/download.html), extract, and add to `PATH` (e.g., `C:\ffmpeg\bin`).  
      - **Linux**: Run `sudo apt update && sudo apt install ffmpeg`.
 
 3. **Run the Script**:  
@@ -86,7 +86,7 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
      ```
 
 3. **Build and Run**:  
-   - Save the C source files
+   - Save the source files
    - In a terminal, navigate to the project folder:  
      ```bash
      cd path/to/project/folder
@@ -107,5 +107,5 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
        cmake --build .
        ```  
    - Run the executable:  
-     - **Windows** : `.\media_migration.exe C:\source C:\dest`  
-     - **Linux** : `./media_migration /source /dest`
+     - **Windows** : `.\media_migration.exe C:\source C:\dest` (add -r or -o for modes)  
+     - **Linux** : `./media_migration /source /dest` (add -r or -o for modes)
