@@ -1,4 +1,4 @@
-# Media Files Handler
+## Media Files Handler
 
 **For those low on space and done with paying for cloud storage.** 
 
@@ -20,9 +20,9 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
 
 ---
 
-### Setup Instructions
+## Setup Instructions
 
-## Python Version
+### Python Version
 
 1. **Install Python**:  
    - Download and install Python 3.8+ from [python.org](https://www.python.org/downloads/).  
@@ -52,9 +52,7 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
 
 ---
 
-## C Version
-
-### Setup Instructions
+### C Version
 
 1. **Install Build Tools**:  
    - **Windows** : Install [CMake](https://cmake.org/download/) and [Ninja](https://ninja-build.org/). Add to PATH.  
