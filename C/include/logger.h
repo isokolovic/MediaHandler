@@ -10,6 +10,8 @@ typedef enum{
     LOG_DEBUG
 } LogLevel;
 
+#define LOG_FILE "Log.log" //Log file name (and path!)
+
 void init_logger(const char* filename); 
 void log_message(LogLevel level, const char* format, ...); 
 void close_logger(void);
@@ -22,6 +24,15 @@ static void ffmpeg_log_callback(void* ptr, int level, const char* fmt, va_list v
         vsnprintf(buf, sizeof(buf), fmt, vl);
         log_message(LOG_ERROR, "FFmpeg: %s", buf);
     }
+}
+
+/// @brief Final log 
+static void log_summary(int processed, int failed) {
+    printf("\n======= PROCESSING SUMMARY =======\n");
+    printf("Processed %d files. Failed: %d.\n", processed, failed);
+    printf("To retry compression for failed files, run program with -r argument: \n\n");
+    printf(".\media_migration.exe -r OR ./media_migration.out -r. \n\n");
+    printf("==================================\n\n");
 }
 
 #endif

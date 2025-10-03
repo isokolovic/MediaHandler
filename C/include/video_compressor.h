@@ -1,11 +1,11 @@
 #ifndef VIDEO_COMPRESSOR_H
 #define VIDEO_COMPRESSOR_H
 
+#include "file_handler.h"
+#include "logger.h"
 #include <libswscale/swscale.h>
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
-#include "file_handler.h"
-#include "logger.h"
 
 typedef struct {
     AVFormatContext* in_ctx;

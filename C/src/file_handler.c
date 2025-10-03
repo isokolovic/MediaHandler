@@ -1,11 +1,11 @@
-﻿#include <stdio.h>
+﻿#include "file_handler.h"
+#include "image_compressor.h"
+#include "video_compressor.h"
+#include "logger.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include "file_handler.h"
-#include "logger.h"
-#include "image_compressor.h"
-#include "video_compressor.h"
 
 #ifdef _WIN32
 #include <string.h>
@@ -375,6 +375,78 @@ bool compress_file(const char* file, const char* output_file) {
     }
     log_file_processing(file, status); 
     return status;
+}
+
+/// @brief Function to parse LOG_FILE for failed files
+/// @param log_path Path to the LOG_FILE
+/// @param num_failed number of failed files (avoids looping through array to count elements)
+/// @return NULL-terminated array of file paths (strings) - handling variable-length lists of paths without fixed-size buffers
+char** get_failed_files_from_log(const char* log_path, int* num_failed)
+{
+    FILE* log = fopen(log_path, "r");
+    if (!log) {
+        *num_failed = 0;
+        log_message(LOG_ERROR, "Log file not found!");
+        return NULL;
+    }
+
+    char** failed_files = NULL;//Dynamic array of strings
+    int count = 0;
+    char line[1024];//Buffer for each line in the log
+
+    while (fgets(line, sizeof(line), log)) {
+        const char* marker = "File Processing: ";
+        const char* status_marker = " - FAILED";
+
+        // Find the start of the file path
+        char* start = strstr(line, marker);
+        if (!start) continue;  //Skip lines without "File Processing:"
+
+        start += strlen(marker); //Move pointer past the marker
+
+        //Find the end of the file path (before " - FAILED") and skip if status not "failed"
+        char* end = strstr(start, status_marker);
+        if (!end) continue;
+
+        size_t len = end - start;
+        if (len <= 0 || len >= sizeof(line)) continue;  //Sanity check
+
+        //Copy exact substring and null-terminate it
+        char file_path[512];
+        memcpy(file_path, start, len);  
+        file_path[len] = '\0';
+
+        // Allocate space and store the path
+        failed_files = realloc(failed_files, (count + 1) * sizeof(char*));
+        failed_files[count++] = strdup(file_path);
+    }
+
+    fclose(log);
+
+    // Null-terminate the array
+    failed_files = realloc(failed_files, (count + 1) * sizeof(char*));
+    failed_files[count] = NULL;
+    *num_failed = count;
+
+    return failed_files;
+}
+
+/// @brief Retry failed file processing attempts.
+/// @param root_source Source directory
+/// @param destination_folder Destination directory
+/// @param failed_files Array of failed file paths.
+/// @param num_failed Number of failed files
+/// @param total_processed Pointer to total processed counter
+/// @param total_failed Pointer to total failed counter
+void retry_failed_files(const char* root_source, const char* destination_folder, char** failed_files, int num_failed, int* total_processed, int* total_failed) {
+    for (int i = 0; i < num_failed; i++) {
+        log_message(LOG_INFO, "Retrying file: %s", failed_files[i]);
+        (*total_processed)++;
+
+        if (!create_folder_process_file(root_source, destination_folder, failed_files[i])) {
+            (*total_failed)++;  
+        }
+    }
 }
 
 /// @brief Create folder if needed and copy compressed file to the destination

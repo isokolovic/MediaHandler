@@ -1,12 +1,15 @@
 #include "file_handler.h"
 #include "logger.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 
 #ifdef _WIN32
 #include <Windows.h>
 #else
 #include <dirent.h>
+#include <unistd.h>
 #endif
 
 /// @brief Main function for the migration
@@ -44,13 +47,9 @@ void run_media_migration(const char* root_source, const char* source_folder, con
         } else if (is_file_type_valid(find_data.cFileName)){
             log_message(LOG_INFO, "Processing file: %s", find_data.cFileName);
             
-            if (create_folder_process_file(root_source, destination_folder, full_path)) {
-                (*processed)++;
-            }
-            else {
-                (*processed)++;
-                (*failed)++;
-            }            
+            //Increment processed files number
+            (*processed)++;
+            if(!create_folder_process_file(root_source, destination_folder, full_path)) (*failed)++;      
         }
 
     } while (FindNextFile(search_handle, &find_data)); 
@@ -61,8 +60,8 @@ void run_media_migration(const char* root_source, const char* source_folder, con
 #endif
 }
 
-int main(void){
-    init_logger("Log.log");
+int main(int argc, char* argv[]) {
+    init_logger(LOG_FILE);
 
     char source_folder[1024];
     char destination_folder[1024];
@@ -83,15 +82,47 @@ int main(void){
     strcpy(source_folder, "C:\\Users\\isoko\\Desktop\\New folder\\S");
     strcpy(destination_folder, "C:\\Users\\isoko\\Desktop\\New folder\\D");
 
-    run_media_migration(source_folder, source_folder, destination_folder, &processed, &failed); 
-    close_logger(); 
+    //Retry mode
+    int retry_mode = 0;
+    int organize_mode = 0;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-r") == 0) {
+            retry_mode = 1;
+            log_message(LOG_INFO, "Running in retry mode: Processing only failed files from " LOG_FILE);
+            break;
+        }
+        if (strcmp(argv[i], "-o") == 0) {
+            organize_mode = 1;
+            log_message(LOG_INFO, "Running in file organization mode");
+            break;
+        }
+    }
+        
+    if (retry_mode) {
+        int num_failed = 0;
+        char** failed_files = get_failed_files_from_log(LOG_FILE, &num_failed);
 
-    //Print summary to stdout
-    printf("\n======= PROCESSING SUMMARY =======\n");
-    printf("Processed %d files. Failed: %d.\n", processed, failed);
-    printf("To retry compression for failed files, run program with -r argument: \n\n");
-    printf(".\media_migration.exe -r OR ./media_migration.out -r. \n\n");
-    printf("==================================\n\n");
+        if (num_failed > 0 && failed_files) {
+            retry_failed_files(source_folder, destination_folder, failed_files, num_failed, &processed, &failed);
+            
+            // Free the list
+            for (int i = 0; i < num_failed; i++) {
+                free(failed_files[i]);
+            }
+            free(failed_files);
+        }
+        else {
+            log_message(LOG_WARNING, "No failed files found in " LOG_FILE);
+        }
+    }
+    else {
+        run_media_migration(source_folder, source_folder, destination_folder, &processed, &failed); 
+    }
+
+    //Organize mode
+
+    close_logger();
+    log_summary(processed, failed);
 
     return 0;
 }

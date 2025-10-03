@@ -24,4 +24,8 @@ long get_file_size(const char* path);
 bool create_folder_process_file(const char* source_folder, const char* destination_folder, const char* filename);
 bool compress_file(const char* file, const char* output_file);
 
+//For retry mode (-r)
+char** get_failed_files_from_log(const char* log_path, int* num_failed);
+void retry_failed_files(const char* root_source, const char* destination_folder, char** failed_files, int num_failed, int* total_processed, int* total_failed); 
+
 #endif

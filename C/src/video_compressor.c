@@ -1,3 +1,6 @@
+#include "file_handler.h"
+#include "logger.h"
+#include "video_compressor.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,9 +8,6 @@
 #include <libheif/heif.h>
 #include <libexif/exif-data.h> 
 #include <png.h>
-#include "video_compressor.h"
-#include "logger.h"
-#include "file_handler.h"
 
 /// @brief Releases all resources associated with a VideoCompressionContext
 /// @param ctx Pointer to the VideoCompressionContext structure

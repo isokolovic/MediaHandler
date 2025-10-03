@@ -1,3 +1,6 @@
+#include "file_handler.h"
+#include "image_compressor.h"
+#include "logger.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,9 +8,6 @@
 #include <libheif/heif.h>
 #include <libexif/exif-data.h>
 #include <png.h>
-#include "image_compressor.h"
-#include "logger.h"
-#include "file_handler.h"
 
 /// @brief Libjpeg-turbo compression used for .jpg/.jpeg files
 /// @param file Input image
