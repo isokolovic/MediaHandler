@@ -27,7 +27,7 @@ void log_file_processing(const char* file_path, int success)
 /// @brief Opens the log file and prepares the logger for use. 
 /// @param filename Path to the file
 void init_logger(const char* filename) {
-    log_file = fopen(filename, "a");
+    log_file = fopen(filename, "w");
     if (!log_file) {
         fprintf("Failed to open the log file %s\n", filename);
     }
