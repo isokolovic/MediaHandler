@@ -16,7 +16,7 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
 **Modes:** 
 
 - **Retry Mode:** run via cmd with additional `-r` argument to retry compression for failed files (e.g. .\media_migration.exe -r).
-- **Organize Mode:** run via cmd with additional `-o` argument to sort files into folders by creation year.
+- **Organize Mode:** run via cmd with additional `-o` argument to sort files into folders by creation year. **Beware**, files will be moved from existing folder structure to a new one. 
 
 ---
 
