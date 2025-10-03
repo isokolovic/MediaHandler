@@ -55,7 +55,7 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
 ### C Version
 
 1. **Install Build Tools**:  
-   - **Windows** : Install [CMake](https://cmake.org/download/) and [Ninja](https://ninja-build.org/). Add to PATH.  
+   - **Windows** : Install [CMake](https://cmake.org/download/) and [Ninja](https://ninja-build.org/). Add to `PATH`.  
    - **Linux** : Run `sudo apt update && sudo apt install cmake ninja-build git`.
 
 2. **Install Dependencies**:  
@@ -67,9 +67,9 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
        cd vcpkg
        .\bootstrap-vcpkg.bat
        ```
-       - Add vcpkg to PATH
+       - Add vcpkg to `PATH`
        ```cmd
-       Edit environment variables -> Add vcpkg root folder to PATH (e.g. C:\vcpkg)
+       Edit environment variables -> Add vcpkg root folder to `PATH` (e.g. C:\vcpkg)
        ```
 
      - Install dependencies:  
