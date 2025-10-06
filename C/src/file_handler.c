@@ -449,6 +449,174 @@ void retry_failed_files(const char* root_source, const char* destination_folder,
     }
 }
 
+/// @brief Get creation year from file
+/// @param file_path Path to the file
+/// @return Year as integer, 0 on error
+int get_file_creation_year(const char* file_path)
+{
+    struct stat st;
+    if (stat(file_path, &st) != 0) {
+        log_message(LOG_ERROR, "Failed to stat %s: %s", file_path, strerror(errno));
+        return 0;
+    }
+
+#ifdef _WIN32
+    HANDLE hFile = CreateFileA(file_path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        return 0;
+    }
+
+    FILETIME creation_time;
+    GetFileTime(hFile, &creation_time, NULL, NULL);
+    CloseHandle(hFile);
+
+    SYSTEMTIME sys_time;
+    FileTimeToSystemTime(&creation_time, &sys_time);
+    return sys_time.wYear;
+#else
+    // Use ctime for creation
+    time_t ctime = st.st_ctime;
+    struct tm* tm = localtime(&ctime);
+    return tm ? tm->tm_year + 1900 : 0;
+#endif
+}
+
+/// @brief Move file to year-based folder
+/// @param root_source Root source folder
+/// @param destination_folder Destination base folder
+/// @param file_path File path
+/// @param year File creation year
+/// @return 1 on success, 0 on failure
+int move_file_to_year_folder(const char* root_source, const char* destination_folder, const char* file_path, int year)
+{
+    if (year <= 0) {
+        log_message(LOG_ERROR, "Invalid year for %s", file_path);
+        return 0;
+    }
+
+    char year_folder[1024];
+    snprintf(year_folder, sizeof(year_folder), "%d", year);
+
+    char dest_dir[1024];
+#ifdef _WIN32
+    snprintf(dest_dir, sizeof(dest_dir), "%s\\%s", destination_folder, year_folder);
+#else
+    snprintf(dest_dir, sizeof(dest_dir), "%s/%s", destination_folder, year_folder);
+#endif
+
+    if (!create_directory(dest_dir)) {
+        log_message(LOG_ERROR, "Failed to create year folder %s", dest_dir);
+        return 0;
+    }
+
+    const char* filename = strrchr(file_path, '\\');
+    if (!filename) filename = strrchr(file_path, '/');
+    if (!filename) filename = file_path;
+    else filename++;  // Skip separator
+
+    char dest_path[1024];
+#ifdef _WIN32
+    snprintf(dest_path, sizeof(dest_path), "%s\\%s", dest_dir, filename);
+#else
+    snprintf(dest_path, sizeof(dest_path), "%s/%s", dest_dir, filename);
+#endif
+
+    if (rename(file_path, dest_path) != 0) {
+        log_message(LOG_ERROR, "Failed to move %s to %s: %s", file_path, dest_path, strerror(errno));
+        return 0;
+    }
+
+    log_message(LOG_INFO, "Organized %s to %s/%d", file_path, destination_folder, year);
+    return 1;
+}
+
+/// @brief Organize files by creation year
+/// @param root_source Root source folder
+/// @param source_folder Current folder to process
+/// @param destination_folder Destination base folder
+/// @param processed Pointer to processed counter
+/// @param failed Pointer to failed counter
+void organize_files(const char* root_source, const char* source_folder, const char* destination_folder, int* processed, int* failed)
+{
+    log_message(LOG_INFO, "Organizing files in %s to %s", source_folder, destination_folder);
+
+#ifdef _WIN32
+    char search_path[1024];
+    snprintf(search_path, sizeof(search_path), "%s\\*.*", source_folder);
+
+    WIN32_FIND_DATA find_data;
+    HANDLE search_handle = FindFirstFile(search_path, &find_data);
+    if (search_handle == INVALID_HANDLE_VALUE) {
+        log_message(LOG_ERROR, "Failed to open directory %s: %lu", source_folder, GetLastError());
+        return;
+    }
+
+    do {
+        if (strcmp(find_data.cFileName, ".") == 0 || strcmp(find_data.cFileName, "..") == 0) continue;
+
+        char full_path[1024];
+        snprintf(full_path, sizeof(full_path), "%s\\%s", source_folder, find_data.cFileName);
+
+        struct stat st;
+        if (stat(full_path, &st) != 0) {
+            log_message(LOG_ERROR, "Failed to stat %s: %s", full_path, strerror(errno));
+            (*failed)++;
+            continue;
+        }
+
+        if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            organize_files(root_source, full_path, destination_folder, processed, failed);
+        }
+        else if (is_file_type_valid(find_data.cFileName)) {
+            (*processed)++;
+
+            int year = get_file_creation_year(full_path);
+            if (!move_file_to_year_folder(root_source, destination_folder, full_path, year)) {
+                (*failed)++;
+            }
+        }
+
+    } while (FindNextFile(search_handle, &find_data));
+
+    FindClose(search_handle);
+#else
+    DIR* dir = opendir(source_folder);
+    if (!dir) {
+        log_message(LOG_ERROR, "Failed to open directory %s: %s", source_folder, strerror(errno));
+        return;
+    }
+
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+
+        char full_path[1024];
+        snprintf(full_path, sizeof(full_path), "%s/%s", source_folder, entry->d_name);
+
+        struct stat st;
+        if (stat(full_path, &st) != 0) {
+            log_message(LOG_ERROR, "Failed to stat %s: %s", full_path, strerror(errno));
+            (*failed)++;
+            continue;
+        }
+
+        if (S_ISDIR(st.st_mode)) {
+            organize_files_by_year(root_source, full_path, destination_folder, processed, failed);
+        }
+        else if (is_file_type_valid(entry->d_name)) {
+            (*processed)++;
+
+            int year = get_file_creation_year(full_path);
+            if (!move_file_to_year_folder(root_source, destination_folder, full_path, year)) {
+                (*failed)++;
+            }
+        }
+    }
+
+    closedir(dir);
+#endif
+}
+
 /// @brief Create folder if needed and copy compressed file to the destination
 /// @param root Root folder 
 /// @param destination_folder Destination folder
