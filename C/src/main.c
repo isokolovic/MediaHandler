@@ -55,8 +55,40 @@ void run_media_migration(const char* root_source, const char* source_folder, con
     } while (FindNextFile(search_handle, &find_data)); 
 
     FindClose(search_handle);
-#else
-    //TODO Linux implementation
+#else    
+    DIR* dir = opendir(source_folder);
+    if (!dir) {
+        log_message(LOG_ERROR, "Failed to open directory %s: %s", source_folder, strerror(errno));
+        return;
+    }
+
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+
+        char full_path[1024];
+        snprintf(full_path, sizeof(full_path), "%s/%s", source_folder, entry->d_name);
+
+        struct stat st;
+        if (stat(full_path, &st) != 0) {
+            log_message(LOG_ERROR, "Failed to stat %s: %s", full_path, strerror(errno));
+            (*failed)++;
+            continue;
+        }
+
+        if (S_ISDIR(st.st_mode)) {
+            run_media_migration(root_source, full_path, destination_folder, processed, failed);
+        }
+        else if (is_file_type_valid(entry->d_name)) {
+            (*processed)++;
+            log_message(LOG_INFO, "Processing file: %s", entry->d_name);
+            if (!create_folder_process_file(root_source, destination_folder, full_path)) {
+                (*failed)++;
+            }
+        }
+    }
+
+    closedir(dir);
 #endif
 }
 
