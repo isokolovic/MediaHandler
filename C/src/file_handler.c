@@ -26,8 +26,8 @@
 #endif
 
 static const char* image_extensions[] = { ".jpg", ".jpeg", ".heic", ".png", ".bmp" };
-static const char* video_extensions[] = { ".mp4", ".avi", ".mov", ".3gp" };
-static const char* other_extensions[] = { ".gif", ".mp3" };
+static const char* video_extensions[] = { ".mp4", ".avi", ".mov"/*, ".3gp"*/ }; //3gp not supported currently (encoder compatibility)
+static const char* other_extensions[] = { ".gif", ".mp3", ".3gp"};
 //Think twice before modifying (. = file extension, " " used in folder naming, etc.) 
 static const char* special_chars = " %:/,\\{}~[]<>*?čćžđšČĆŽŠĐ";
 static const char* folder_special_chars = "%:/,.\\{}~[]<>*?čćžđšČĆŽŠĐ";
@@ -365,14 +365,17 @@ bool compress_file(const char* file, const char* output_file) {
     if (!file || !output_file) {
         log_message(LOG_ERROR, "Null input or output path in compress_file");                
     }
-    if (!extension) {
+    else if (!extension) {
         log_message(LOG_ERROR, "No extension found for %s", file);        
     }
-    if (is_image(file)) {
+    else if (is_image(file)) {
         status = compress_image(file, output_file, extension);        
     }
-    if (is_video(file)) {
+    else if (is_video(file)) {
         status = compress_video(file, output_file);
+    }
+    else {
+        status = true; //Only copy other file types
     }
     log_file_processing(file, status); 
     return status;

@@ -1,7 +1,13 @@
 #ifndef FILE_HANDLER
 #define FILE_HANDLER
 
+#ifdef _WIN32
 #define strcasecmp _stricmp
+#else
+#include <strings.h>
+#define str_icmp strcasecmp
+#endif
+
 #define EMTPY_FILENAME "Unnamed"
 
 #include <stddef.h>
