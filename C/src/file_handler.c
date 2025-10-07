@@ -19,6 +19,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #define STAT_STRUCT struct stat
 #define STAT_FUNC stat
 #define mkdir(path) mkdir(path, 0755)
