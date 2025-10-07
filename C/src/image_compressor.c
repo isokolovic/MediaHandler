@@ -115,15 +115,6 @@ bool compress_heic(const char* file, const char* output_file) {
 	struct heif_image* image = NULL;
 	struct heif_encoder* encoder = NULL;
 
-	const char* const* dirs = heif_get_plugin_directories();
-	if (dirs) {
-		for (int i = 0; dirs[i]; ++i) {
-			if (dirs[i][0] != '\0') // Only print non-empty directories
-				printf("libheif plugin dir: %s\n", dirs[i]);
-		}
-		heif_free_plugin_directories(dirs);
-	}
-
 	context = heif_context_alloc();
 	if (!context) {
 		log_message(LOG_ERROR, "Failed to allocate heif conext for %s", file);

@@ -55,7 +55,7 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
 ### C Version
 
 1. **Install Build Tools**:  
-   - **Windows** : Install [CMake](https://cmake.org/download/) and [Ninja](https://ninja-build.org/). Add to `PATH`.  
+   - **Windows** : Install [CMake](https://cmake.org/download/). Add to `PATH`.  
    - **Linux** : Run `sudo apt update && sudo apt install cmake ninja-build git`.
 
 2. **Install Dependencies**:  
@@ -94,8 +94,10 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
        ```cmd
        mkdir build
        cd build
-       cmake -G "Ninja" -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake ..
+       cmake ..
        cmake --build .
+       ```  
+      ``` Hint: If using [Visual Studio](https://visualstudio.microsoft.com/), make sure you configure Runtime Library to be Multi-threaded DLL (/MD), ensuring executable will rely on the system-installed DLLs.  (Properties / Configuration Properties / C/C++ / Code Generation / Runtime Library)
        ```  
      - **Linux** :  
        ```bash

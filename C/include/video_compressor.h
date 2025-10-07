@@ -26,6 +26,6 @@ typedef struct {
 bool compress_video(const char* file, const char* output_file);
 void cleanup_video(VideoCompressionContext* ctx);
 bool write_packet(AVFormatContext* out_ctx, AVPacket* pkt, AVStream* in_stream, AVStream* out_stream, int stream_index);
-bool process_video_frame(VideoCompressionContext* ctx, const char* filename, int64_t total_duration, int stream_index);
+bool process_video_frame(VideoCompressionContext* ctx, const char* filename, int stream_index);
 
 #endif

@@ -601,7 +601,7 @@ void organize_files(const char* root_source, const char* source_folder, const ch
         }
 
         if (S_ISDIR(st.st_mode)) {
-            organize_files_by_year(root_source, full_path, destination_folder, processed, failed);
+            organize_files(root_source, full_path, destination_folder, processed, failed);
         }
         else if (is_file_type_valid(entry->d_name)) {
             (*processed)++;

@@ -1,5 +1,3 @@
-#include "file_handler.h"
-#include "logger.h"
 #include "video_compressor.h"
 #include <stdio.h>
 #include <stdlib.h>
