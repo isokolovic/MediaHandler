@@ -96,9 +96,12 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
        cd build
        cmake ..
        cmake --build .
-
-      Hint: 
-      If using Visual Studio, make sure you configure Runtime Library to be Multi-threaded DLL (/MD), ensuring executable will rely on the system-installed DLLs.  (Properties / Configuration Properties / C/C++ / Code Generation / Runtime Library)
+        Hint: 
+        If using Visual Studio, make sure you configure Runtime Library to be Multi-threaded DLL (/MD), ensuring executable will rely on the system-installed DLLs.  (Properties / Configuration Properties / C/C++ / Code Generation / Runtime Library)
+       ```
+     - Hint:
+        ```cmd
+        If using Visual Studio, make sure you configure Runtime Library to be Multi-threaded DLL (/MD), ensuring executable will rely on the system-installed DLLs.  (Properties / Configuration Properties / C/C++ / Code Generation / Runtime Library)
        ```
      - **Linux** :  
        ```bash
