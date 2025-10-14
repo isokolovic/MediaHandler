@@ -2,7 +2,7 @@ import os
 import pytest
 import shutil
 
-SOURCE_DIR = os.path.abspath("C:\\Users\\isoko\\Desktop\\New folder\\S")# Set this to the absolute path where your test media files are located
+SOURCE_DIR = os.path.abspath("")# Set this to the absolute path where your test media files are located
 TARGET_DIR = os.path.join(SOURCE_DIR, "target")
 os.makedirs(TARGET_DIR, exist_ok=True)
 
