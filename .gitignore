@@ -1,4 +1,6 @@
-﻿*/out/
+﻿__pycache__/
+*/out/
 */.vs/
 */.vscode/
-/.vs
+/.vs/
+*.log

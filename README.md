@@ -31,7 +31,7 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
 2. **Install Dependencies**:  
    - Open a terminal and run:  
      ```bash
-     pip install Pillow pillow-heif
+     pip install Pillow pillow-heif av 
      ```  
    - Install `ffmpeg`:  
      - **Windows**: Download from [ffmpeg.org](https://ffmpeg.org/download.html), extract, and add to `PATH` (e.g., `C:\ffmpeg\bin`).  

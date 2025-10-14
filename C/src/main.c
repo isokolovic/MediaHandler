@@ -40,7 +40,7 @@ void run_media_migration(const char* root_source, const char* source_folder, con
             log_message(LOG_ERROR, "Failed to stat %s: %s", full_path, strerror(errno));
         }
 
-        //If a directory, recursibely process subdirectories.
+        //If a directory, recursively process subdirectories.
         //Else create dir if needed and process the file
         if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
             run_media_migration(root_source, full_path, destination_folder, processed, failed);
@@ -92,8 +92,11 @@ void run_media_migration(const char* root_source, const char* source_folder, con
 #endif
 }
 
+//TODO If any other argument is added? Will it show prompt for source and target folders? -> Fix
+//TODO Save source_folder and target_folder to log file and extract them in -r mode (not to show prompt)
+//TODO organize mode - implement fallback for the lowes possible date (if created > modified: use modified)
 int main(int argc, char* argv[]) {
-    init_logger(LOG_FILE);
+    init_logger(LOG_FILE); //TODO check if log is cleaned when -r is run
 
     char source_folder[1024];
     char destination_folder[1024];
@@ -102,19 +105,19 @@ int main(int argc, char* argv[]) {
     int processed = 0; 
     int failed = 0; 
 
-    //if (get_valid_directory("Enter the path to the source folder: ", source_folder, sizeof(source_folder)) != 0) {
-    //    close_logger();
-    //    return 1;
-    //}
-    //if (get_valid_directory("Enter the path to the destination folder: ", destination_folder, sizeof(destination_folder)) != 0) {
-    //    close_logger();
-    //    return 1;
-    //}
+    if (get_valid_directory("Enter the path to the source folder: ", source_folder, sizeof(source_folder)) != 0) {
+        close_logger();
+        return 1;
+    }
+    if (get_valid_directory("Enter the path to the destination folder: ", destination_folder, sizeof(destination_folder)) != 0) {
+        close_logger();
+        return 1;
+    }
 
     strcpy(source_folder, "C:\\Users\\isoko\\Desktop\\New folder\\S");
     strcpy(destination_folder, "C:\\Users\\isoko\\Desktop\\New folder\\D");
 
-    //Retry mode
+    //Retry and organize modes
     int retry_mode = 0;
     int organize_mode = 0;
     for (int i = 1; i < argc; i++) {

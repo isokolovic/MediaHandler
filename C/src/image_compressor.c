@@ -108,7 +108,7 @@ cleanup:
 /// @param file Input image
 /// @param output_file Compressed image
 /// @return True if compression successful
-bool compress_heic(const char* file, const char* output_file) {
+bool compress_heic(const char* file, const char* output_file) { //TODO add exif data
 	struct heif_context* context = NULL;
 	struct heif_image_handle* handle = NULL;
 
@@ -374,7 +374,6 @@ bool compress_image(const char* file, const char* output_file, const char* exten
             log_message(LOG_ERROR, "Failed to copy %s to %s", file, output_file);
             return false;
         }
-        log_message(LOG_INFO, "Processing file: %s - 100%%", file);
         return true;
     }
 }

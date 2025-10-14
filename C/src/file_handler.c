@@ -352,7 +352,6 @@ bool is_file_type_valid(const char* filename) {
     return is_image(filename) || is_video(filename) || is_gif_misc(filename);
 }
 
-
 /// @brief Main function for file compression
 /// @param file File to be compressed
 /// @param output_file Compressed file
@@ -491,7 +490,7 @@ int get_file_creation_year(const char* file_path)
 /// @param file_path File path
 /// @param year File creation year
 /// @return 1 on success, 0 on failure
-int move_file_to_year_folder(const char* root_source, const char* destination_folder, const char* file_path, int year)
+int move_file_to_year_folder(const char* root_source, const char* destination_folder, const char* file_path, int year)  //TODO remove root_source?
 {
     if (year <= 0) {
         log_message(LOG_ERROR, "Invalid year for %s", file_path);
