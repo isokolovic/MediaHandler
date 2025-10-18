@@ -1,8 +1,12 @@
 ﻿cmake_minimum_required(VERSION 3.10)
-project(MediaMigration C)
+project(MediaMigration C CXX)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+enable_testing()
 
 # Main target
 add_executable(media_migration
@@ -13,13 +17,24 @@ add_executable(media_migration
     src/video_compressor.c
 )
 
+# Testing target
+add_executable(media_migration_tests
+    tests/test_logger.cpp
+)
+
 # Include directories
 target_include_directories(media_migration PRIVATE
     ${CMAKE_SOURCE_DIR}/include
 )
 
+target_include_directories(media_migration_tests PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
 if(UNIX)
     find_package(PkgConfig REQUIRED)
+    find_package(GTest CONFIG REQUIRED)
+
     pkg_check_modules(EXIF REQUIRED libexif)
     pkg_check_modules(HEIF REQUIRED libheif)
     pkg_check_modules(AVFORMAT REQUIRED libavformat)
@@ -46,5 +61,9 @@ if(UNIX)
         ${EXIF_LIBRARIES} ${HEIF_LIBRARIES}
         ${AVFORMAT_LIBRARIES} ${AVCODEC_LIBRARIES}
         ${AVUTIL_LIBRARIES} ${SWS_LIBRARIES}
+    )
+
+    target_link_libraries(media_migration_tests PRIVATE
+    GTest::gtest
     )
 endif()
