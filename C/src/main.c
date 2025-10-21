@@ -114,9 +114,6 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    strcpy(source_folder, "C:\\Users\\isoko\\Desktop\\New folder\\S");
-    strcpy(destination_folder, "C:\\Users\\isoko\\Desktop\\New folder\\D");
-
     //Retry and organize modes
     int retry_mode = 0;
     int organize_mode = 0;

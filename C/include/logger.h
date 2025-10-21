@@ -13,7 +13,15 @@ typedef enum{
 #define LOG_FILE "Log.log" //Log file name (and path!)
 
 void init_logger(const char* filename); 
-void log_message(LogLevel level, const char* format, ...); 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void log_message(LogLevel level, const char *format, ...);
+
+#ifdef __cplusplus
+}
+#endif
 void close_logger(void);
 void log_file_processing(const char* file_path, int success);
 
