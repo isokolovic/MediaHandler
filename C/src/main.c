@@ -11,6 +11,7 @@
 #include <dirent.h>
 #include <unistd.h>
 #endif
+//test
 
 /// @brief Main function for the migration
 /// @param source_folder Folder containing original media
