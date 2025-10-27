@@ -28,6 +28,16 @@ bool compress_jpeg(const char* file, const char* output_file) {
 		return false;
 	}
 
+	// Check magic number before libheif processes the file
+	// Confirm it's actually .jpeg/.jpg to aviod unhandled crashes
+	unsigned char sig[3];
+	if (fread(sig, 1, 3, in_file) != 3 || sig[0] != 0xFF || sig[1] != 0xD8 || sig[2] != 0xFF) {
+		log_message(LOG_ERROR, "File %s is not a valid JPEG (missing FF D8 FF signature)", file);
+		fclose(in_file);
+		return false;
+	}
+	rewind(in_file);  // Reset file pointer before jpeg_stdio_src (if type check passes)
+
 	// Open output file for writing
 	out_file = fopen(output_file, "wb");
 	if (!out_file) {
@@ -114,6 +124,24 @@ bool compress_heic(const char* file, const char* output_file) { //TODO add exif 
 
 	struct heif_image* image = NULL;
 	struct heif_encoder* encoder = NULL;
+
+	// Check magic number before libheif processes the file
+	// Confirm it's actually .heic to aviod unhandled crashes
+	FILE* f = fopen(file, "rb");
+	if (!f) {
+		log_message(LOG_ERROR, "Failed to open %s for format check", file);
+		return false;
+	}
+	unsigned char header[12] = { 0 };
+	size_t read = fread(header, 1, sizeof(header), f);
+	fclose(f);
+
+	if (read < 12 || memcmp(&header[4], "ftypheic", 8) != 0) {
+		log_message(LOG_ERROR, "File %s is not a valid HEIC (missing ftypheic signature)", file);
+		return false;
+	}
+
+	//Proceed with compression
 
 	context = heif_context_alloc();
 	if (!context) {
@@ -202,6 +230,14 @@ bool compress_png(const char* file, const char* output_file)
 		log_message(LOG_ERROR, "Failed to open input file %s: %s", file, strerror(errno));
 		return false;
 	}
+
+	unsigned char sig[8];
+	if (fread(sig, 1, 8, in_file) != 8 || memcmp(sig, "\x89PNG\r\n\x1A\n", 8) != 0) {
+		log_message(LOG_ERROR, "File %s is not a valid PNG (missing PNG signature)", file);
+		fclose(in_file);
+		return false;
+	}
+	rewind(in_file);  // Reset file pointer
 
 	//Initialize libpng for reading
 	png_read_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
