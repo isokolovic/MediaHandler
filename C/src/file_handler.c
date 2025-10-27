@@ -4,6 +4,7 @@
 #include "logger.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -628,7 +629,7 @@ bool create_folder_process_file(const char* source_folder, const char* destinati
 {
     if (!source_folder || !destination_folder || !filename) {
         log_message(LOG_ERROR, "NULL parameter in create_folder_process_file");
-        return;
+        return false;
     }
 
     char* base_filename = strrchr(filename, '/');
@@ -639,7 +640,7 @@ bool create_folder_process_file(const char* source_folder, const char* destinati
     char* clean_filename = clean_name(base_filename, false);
     if (!clean_filename) {
         log_message(LOG_ERROR, "Failed to clean filename %s", base_filename);
-        return;
+        return false;
     }
 
     //Extract relative path 
@@ -647,7 +648,7 @@ bool create_folder_process_file(const char* source_folder, const char* destinati
     if (!subdirectory) {
         log_message(LOG_ERROR, "Failed to extract subdirectory for %s", filename);
         free(clean_filename); //malloc used in clean_name()
-        return;
+        return false;
     }
 
     //Create destination directory
@@ -668,7 +669,7 @@ bool create_folder_process_file(const char* source_folder, const char* destinati
     if (!create_directory(destination_dir)) {
         log_message(LOG_ERROR, "Failed to create destination directory %s", destination_dir);
         free(clean_filename); //malloc used in clean_name()
-        return;
+        return false;
     }
 
     //Create a file path and make a copy on the destination location
@@ -696,7 +697,7 @@ bool create_folder_process_file(const char* source_folder, const char* destinati
     char* clean_basename = clean_name(base_name, false);
     if (!clean_basename) {
         log_message(LOG_ERROR, "Failed to clean basename");
-        return;
+        return false;
     }
 
     //Create path of temporary copy to be compressed 
@@ -723,14 +724,14 @@ bool create_folder_process_file(const char* source_folder, const char* destinati
 
         if (file_size > file_copy_size) {
             log_message(LOG_WARNING, "Compressed copy already exists at the location %s", destination_path);
-            return;
+            return false;
         }
     }
 
     if (!copy_file(filename, temp_file)) {
         log_message(LOG_ERROR, "Failed to create temporary file copy for %s", temp_file);
         free(clean_filename);
-        return;
+        return false;
     }
 
     //Compress the file copy
