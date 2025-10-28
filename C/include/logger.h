@@ -10,7 +10,7 @@ typedef enum{
     LOG_DEBUG
 } LogLevel;
 
-#define LOG_FILE "Log.log" //Log file name (and path!)
+#define LOG_FILE_PATH "Log.log" //Log file name (and path!)
 
 void init_logger(const char* filename); 
 #ifdef __cplusplus

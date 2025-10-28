@@ -96,7 +96,7 @@ void run_media_migration(const char* root_source, const char* source_folder, con
 //TODO Save source_folder and target_folder to log file and extract them in -r mode (not to show prompt)
 //TODO organize mode - implement fallback for the lowes possible date (if created > modified: use modified)
 int main(int argc, char* argv[]) {
-    init_logger(LOG_FILE); //TODO check if log is cleaned when -r is run
+    init_logger(LOG_FILE_PATH); //TODO check if log is cleaned when -r is run
 
     char source_folder[1024];
     char destination_folder[1024];
@@ -120,7 +120,7 @@ int main(int argc, char* argv[]) {
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-r") == 0) {
             retry_mode = 1;
-            log_message(LOG_INFO, "Running in retry mode: Processing only failed files from " LOG_FILE);
+            log_message(LOG_INFO, "Running in retry mode: Processing only failed files from " LOG_FILE_PATH);
             break;
         }
         if (strcmp(argv[i], "-o") == 0) {
@@ -132,7 +132,7 @@ int main(int argc, char* argv[]) {
         
     if (retry_mode) {
         int num_failed = 0;
-        char** failed_files = get_failed_files_from_log(LOG_FILE, &num_failed);
+        char** failed_files = get_failed_files_from_log(LOG_FILE_PATH, &num_failed);
 
         if (num_failed > 0 && failed_files) {
             retry_failed_files(source_folder, destination_folder, failed_files, num_failed, &processed, &failed);
@@ -144,7 +144,7 @@ int main(int argc, char* argv[]) {
             free(failed_files);
         }
         else {
-            log_message(LOG_WARNING, "No failed files found in " LOG_FILE);
+            log_message(LOG_WARNING, "No failed files found in " LOG_FILE_PATH);
         }
     }
     else if (organize_mode) {

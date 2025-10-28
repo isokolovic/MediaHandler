@@ -29,9 +29,16 @@ target_link_libraries(media_migration PRIVATE media_core)
 target_include_directories(media_migration PRIVATE ${PROJECT_INCLUDE_DIR})
 
 # Test executable
-add_executable(media_migration_tests tests/test_logger.cpp)
+add_executable(media_migration_tests 
+    tests/src/test_main.cpp
+    tests/src/test_utilities.cpp
+    tests/src/test_logger.cpp
+)
 target_link_libraries(media_migration_tests PRIVATE media_core)
-target_include_directories(media_migration_tests PRIVATE ${PROJECT_INCLUDE_DIR})
+target_include_directories(media_migration_tests PRIVATE
+    ${PROJECT_INCLUDE_DIR}
+    ${CMAKE_SOURCE_DIR}/tests/include
+)
 
 # Linux-specific setup
 if(UNIX)
