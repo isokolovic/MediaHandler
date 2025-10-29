@@ -14,8 +14,10 @@
 
 //CONFIGURATION
 //Specify source and target folders:
-const char* SOURCE_DIR = "C:/Users/isoko/Desktop/New folder/S";
-const char* TARGET_DIR = "C:/Users/isoko/Desktop/New folder/D";
+const char* SOURCE_DIR = "/mnt/c/Users/isoko/Desktop/New folder/S";
+const char* TARGET_DIR = "/mnt/c/Users/isoko/Desktop/New folder/D";
+//const char* SOURCE_DIR = "C:/Users/isoko/Desktop/New folder/S";
+//const char* TARGET_DIR = "C:/Users/isoko/Desktop/New folder/D";
 const char* LOG_FILE = LOG_FILE_PATH; 
 
 
@@ -46,14 +48,15 @@ void cleanup_target_dir() {
 
 	FindClose(handle);
 #else
-	DIR* dir = opendir(target_dir); 
+	DIR* dir = opendir(TARGET_DIR); 
 	if (!dir) return;
+	struct dirent* entry;
 
 	while ((entry = readdir(dir)) != nullptr) {
 		if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
 
 		char path[4096];
-		snprintf(path, sizeof(path), "%s/%s", target_dir, entry->d_name);
+		snprintf(path, sizeof(path), "%s/%s", TARGET_DIR, entry->d_name);
 
 		struct stat st;
 		if (stat(path, &st) == 0 && S_ISREG(st.st_mode)) {

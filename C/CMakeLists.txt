@@ -33,6 +33,7 @@ add_executable(media_migration_tests
     tests/src/test_main.cpp
     tests/src/test_utilities.cpp
     tests/src/test_logger.cpp
+    tests/src/test_migration.cpp
 )
 target_link_libraries(media_migration_tests PRIVATE media_core)
 target_include_directories(media_migration_tests PRIVATE
