@@ -1,7 +1,12 @@
 #include <libavformat/avformat.h>
 
-#ifndef LOG_H
-#define LOG_H
+#ifndef LOGGER
+#define LOGGER
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 //Log levels
 typedef enum{
     LOG_INFO,
@@ -43,4 +48,8 @@ static void log_summary(int processed, int failed) {
     printf("==================================\n\n");
 }
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif //LOGGER

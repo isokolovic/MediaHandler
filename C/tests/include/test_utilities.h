@@ -1,6 +1,8 @@
-#ifndef TEST_UTILS_H
-#define TEST_UTILS_H
+#ifndef TEST_UTILITIES
+#define TEST_UTILITIES
 
+#include <gtest/gtest.h>
+#include <string.h>
 #include "file_handler.h"
 #include "logger.h"
 #include "image_compressor.h"
@@ -19,6 +21,9 @@ struct TestFile {
 extern const TestFile TEST_FILES[];
 extern const char* EXTENSIONS[];
 
-bool ensure_trget_dir();
+bool ensure_target_dir();
+void cleanup_target_dir();
+std::string read_log_content(const char* path);
+void log_test_outcome(const char* name, bool pass);
 
 #endif

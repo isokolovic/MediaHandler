@@ -1,5 +1,9 @@
-#ifndef VIDEO_COMPRESSOR_H
-#define VIDEO_COMPRESSOR_H
+#ifndef VIDEO_COMPRESSOR
+#define VIDEO_COMPRESSOR
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include "file_handler.h"
 #include "logger.h"
@@ -28,4 +32,8 @@ void cleanup_video(VideoCompressionContext* ctx);
 bool write_packet(AVFormatContext* out_ctx, AVPacket* pkt, AVStream* in_stream, AVStream* out_stream, int stream_index);
 bool process_video_frame(VideoCompressionContext* ctx, const char* filename, int stream_index);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif //VIDEO_COMPRESSOR

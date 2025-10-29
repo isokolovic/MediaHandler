@@ -34,7 +34,7 @@ static const char* special_chars = " %:/,\\{}~[]<>*?čćžđšČĆŽŠĐ";
 static const char* folder_special_chars = "%:/,.\\{}~[]<>*?čćžđšČĆŽŠĐ";
 
 #ifdef _WIN32
-/// @brief Check if provided path is a directory for Windows OS
+/// @brief Check if provided path is a directory
 /// @param path Path provided by the user
 /// @return 1 if the path is a directory, 0 otherwise
 bool is_directory(const char* path){
@@ -227,7 +227,7 @@ char* clean_name(const char* element, bool is_directory )
             return strdup(""); //Empty string for directories
         }
         else {
-            cleaned_name = strdup(EMTPY_FILENAME); //Unnnamed files
+            cleaned_name = strdup(EMPTY_FILENAME); //Unnnamed files
             if (!cleaned_name) {
                 log_message(LOG_ERROR, "Memory allocation failed for clean_name");
                 return NULL;
@@ -420,18 +420,45 @@ char** get_failed_files_from_log(const char* log_path, int* num_failed)
         memcpy(file_path, start, len);  
         file_path[len] = '\0';
 
-        // Allocate space and store the path
-        failed_files = realloc(failed_files, (count + 1) * sizeof(char*));
-        failed_files[count++] = strdup(file_path);
+        // Safely allocate space and store the path
+
+        char* temp = realloc(failed_files, (count + 1) * sizeof(char*));
+        if (!temp) {
+            for (int i = 0; i < count; ++i) free(failed_files[i]);
+            free(failed_files);
+            failed_files = NULL;
+            count = 0;
+            
+            log_message(LOG_ERROR, "Failed to realloc for failed files string array");
+            break;
+        }
+        failed_files = temp;
+
+        if (!failed_files[count]) {
+            for (int i = 0; i < count; ++i) free(failed_files[i]);
+            free(failed_files);
+            *num_failed = 0;
+            return NULL;
+        }
+        failed_files[count++] = strdup(file_path); //Store to current index and increment for next round
     }
 
     fclose(log);
 
     // Null-terminate the array
-    failed_files = realloc(failed_files, (count + 1) * sizeof(char*));
-    failed_files[count] = NULL;
-    *num_failed = count;
 
+    char** temp = realloc(failed_files, (count + 1) * sizeof(char*));
+    if (!temp) {
+        log_message(LOG_ERROR, "Final realloc failed while null-terminating failed_files array");
+        for (int i = 0; i < count; ++i) free(failed_files[i]);
+        free(failed_files);
+        *num_failed = 0;
+        return NULL;
+    }
+    failed_files = temp;
+    failed_files[count] = NULL;
+
+    *num_failed = count;
     return failed_files;
 }
 

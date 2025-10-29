@@ -1,5 +1,9 @@
-#ifndef IMAGE_COMPRESSOR_H
-#define IMAGE_COMPRESSOR_H
+#ifndef IMAGE_COMPRESSOR
+#define IMAGE_COMPRESSOR
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <stdbool.h>
 
@@ -14,4 +18,8 @@ bool compress_heic(const char* file, const char* output_file);
 bool compress_jpeg(const char* file, const char* output_file);
 bool compress_png(const char* file, const char* output_file);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif //IMAGE_COMPRESSOR
