@@ -43,3 +43,21 @@ TEST_F(LoggerTest, LogsMessages) {
 
     log_test_outcome(__func__, passed);
 }
+
+/// @brief Check if retreiving failed files from log works
+/// @param Logger class
+/// @param Test identifier
+TEST_F(LoggerTest, ParsesFailedFiles) {
+    init_logger(LOG_FILE);
+    log_file_processing("C:/a.jpg", false);
+    int n = 0;
+    char** failed = get_failed_files_from_log(LOG_FILE, &n);
+
+    ASSERT_EQ(n, 1);
+    ASSERT_NE(strstr(failed[0], "a.jpg"), nullptr);
+
+    for (int i = 0; i < n; ++i) free(failed[i]);
+    free(failed);
+
+    log_test_outcome("ParsesFailedFiles", true);
+}
