@@ -25,5 +25,6 @@ bool ensure_target_dir();
 void cleanup_target_dir();
 std::string read_log_content(const char* path);
 void log_test_outcome(const char* name, bool pass);
+int count_valid_outputs();
 
 #endif

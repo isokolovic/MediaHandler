@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #else
 #include <dirent.h>
+#include <sys/stat.h>
 #endif
 
 
@@ -14,10 +15,10 @@
 
 //CONFIGURATION
 //Specify source and target folders:
-const char* SOURCE_DIR = "/mnt/c/Users/isoko/Desktop/New folder/S";
-const char* TARGET_DIR = "/mnt/c/Users/isoko/Desktop/New folder/D";
-//const char* SOURCE_DIR = "C:/Users/isoko/Desktop/New folder/S";
-//const char* TARGET_DIR = "C:/Users/isoko/Desktop/New folder/D";
+//const char* SOURCE_DIR = "/mnt/c/Users/isoko/Desktop/New folder/S";
+//const char* TARGET_DIR = "/mnt/c/Users/isoko/Desktop/New folder/D";
+const char* SOURCE_DIR = "C:/Users/isoko/Desktop/New folder/S";
+const char* TARGET_DIR = "C:/Users/isoko/Desktop/New folder/D";
 const char* LOG_FILE = LOG_FILE_PATH; 
 
 
@@ -86,4 +87,39 @@ std::string read_log_content(const char* path) {
 void log_test_outcome(const char* name, bool pass)
 {
 	log_message(pass ? LOG_INFO : LOG_ERROR, "Test %s: %s", name, pass ? "PASSED" : "FAILED");
+}
+
+/// @brief Cout files in target directory
+/// @return Number of files
+int count_valid_outputs() {
+	int count = 0;
+
+#ifdef _WIN32
+	char search_path[4096];
+	snprintf(search_path, sizeof(search_path), "%s\\*.*", TARGET_DIR);
+
+	WIN32_FIND_DATA find_data;
+	HANDLE handle = FindFirstFile(search_path, &find_data);
+	if (handle == INVALID_HANDLE_VALUE) return 0;
+
+	do {
+		if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+		if (is_file_type_valid(find_data.cFileName)) ++count;
+	} while (FindNextFile(handle, &find_data));
+
+	FindClose(handle);
+
+#else
+	DIR* dir = opendir(TARGET_DIR);
+	if (!dir) return 0;
+
+	struct dirent* entry;
+	while ((entry = readdir(dir)) != nullptr) {
+		if (entry->d_type == DT_REG && is_file_type_valid(entry->d_name)) ++count;
+	}
+
+	closedir(dir);
+#endif
+
+	return count;
 }
