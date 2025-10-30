@@ -1,4 +1,3 @@
-#include <gtest/gtest.h>
 #include "test_utilities.h"
 
 class LoggerTest : public ::testing::Test {

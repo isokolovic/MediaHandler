@@ -1,4 +1,3 @@
-#include <gtest/gtest.h>
 #include "media_migration.h"
 #include "test_utilities.h"
 

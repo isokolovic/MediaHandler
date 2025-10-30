@@ -1,6 +1,8 @@
 #include "test_utilities.h"
 #include <fstream>
 #include <sstream> 
+#include <vector>
+#include <string>
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -8,6 +10,7 @@
 #else
 #include <dirent.h>
 #include <sys/stat.h>
+#include <cstring>
 #endif
 
 
@@ -122,4 +125,40 @@ int count_valid_outputs() {
 #endif
 
 	return count;
+}
+
+/// @brief List files in target directory and subdirectories
+/// @param dir Parent target directory
+/// @param ext Optional file extension filter
+/// @return Vector of filenames
+std::vector<std::string> list_files_in_dir(const char* dir, const char* ext) {
+	std::vector<std::string> files;
+
+#ifdef _WIN32
+	std::string search_path = std::string(dir) + "\\*";
+	WIN32_FIND_DATAA fd;
+	HANDLE hFind = FindFirstFileA(search_path.c_str(), &fd);
+	if (hFind == INVALID_HANDLE_VALUE) return files;
+
+	do {
+		if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+			if (!ext || strstr(fd.cFileName, ext))
+				files.push_back(fd.cFileName);
+		}
+	} while (FindNextFileA(hFind, &fd));
+	FindClose(hFind);
+
+#else
+	DIR* d = opendir(dir);
+	if (!d) return files;
+	struct dirent* entry;
+	while ((entry = readdir(d)) != nullptr) {
+		if (entry->d_type != DT_REG) continue;
+		if (!ext || strstr(entry->d_name, ext))
+			files.push_back(entry->d_name);
+	}
+	closedir(d);
+#endif
+
+	return files;
 }

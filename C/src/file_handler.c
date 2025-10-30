@@ -480,35 +480,72 @@ void retry_failed_files(const char* root_source, const char* destination_folder,
     }
 }
 
-/// @brief Get creation year from file
-/// @param file_path Path to the file
-/// @return Year as integer, 0 on error
-int get_file_creation_year(const char* file_path)
+/// @brief Returns the oldest timestamp year (creation or modification)
+/// @param path Full path to the file
+/// @return Year of oldest timestamp, or 0 on error
+int get_file_creation_year(const char* path)
 {
-    struct stat st;
-    if (stat(file_path, &st) != 0) {
-        log_message(LOG_ERROR, "Failed to stat %s: %s", file_path, strerror(errno));
-        return 0;
-    }
-
 #ifdef _WIN32
-    HANDLE hFile = CreateFileA(file_path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE hFile = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) {
+        log_message(LOG_ERROR, "Failed to open file %s: %lu", path, GetLastError());
         return 0;
     }
 
-    FILETIME creation_time;
-    GetFileTime(hFile, &creation_time, NULL, NULL);
+    FILETIME creation_time, modified_time;
+    if (!GetFileTime(hFile, &creation_time, NULL, &modified_time)) {
+        log_message(LOG_ERROR, "Failed to get file times for %s: %lu", path, GetLastError());
+        CloseHandle(hFile);
+        return 0;
+    }
     CloseHandle(hFile);
 
-    SYSTEMTIME sys_time;
-    FileTimeToSystemTime(&creation_time, &sys_time);
-    return sys_time.wYear;
+    // Convert FILETIME to ULARGE_INTEGER for comparison
+    ULARGE_INTEGER c, m;
+    c.LowPart = creation_time.dwLowDateTime;
+    c.HighPart = creation_time.dwHighDateTime;
+    m.LowPart = modified_time.dwLowDateTime;
+    m.HighPart = modified_time.dwHighDateTime;
+
+    ULONGLONG oldest = (c.QuadPart < m.QuadPart) ? c.QuadPart : m.QuadPart;
+
+    // Convert to time_t
+    FILETIME ft;
+    ULARGE_INTEGER ui;
+    ui.QuadPart = oldest;
+    ft.dwLowDateTime = ui.LowPart;
+    ft.dwHighDateTime = ui.HighPart;
+
+    SYSTEMTIME st;
+    if (!FileTimeToSystemTime(&ft, &st)) {
+        log_message(LOG_ERROR, "Failed to convert FILETIME to SYSTEMTIME for %s", path);
+        return 0;
+    }
+
+    return st.wYear;
 #else
-    // Use ctime for creation
-    time_t ctime = st.st_ctime;
-    struct tm* tm = localtime(&ctime);
-    return tm ? tm->tm_year + 1900 : 0;
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        log_message(LOG_ERROR, "Failed to stat %s: %s", path, strerror(errno));
+        return 0;
+    }
+
+#if defined(__APPLE__)
+    time_t created = st.st_birthtime;
+#else
+    time_t created = 0; // Not available on Linux
+#endif
+    time_t modified = st.st_mtime;
+
+    time_t oldest = (created > 0 && created < modified) ? created : modified;
+
+    struct tm* timeinfo = localtime(&oldest);
+    if (!timeinfo) {
+        log_message(LOG_ERROR, "Failed to convert timestamp for %s", path);
+        return 0;
+    }
+
+    return timeinfo->tm_year + 1900;
 #endif
 }
 
