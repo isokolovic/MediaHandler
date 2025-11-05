@@ -4,9 +4,9 @@
 
 ---
 
-Simple tool to compress and organize multimedia files (photos and videos). Available in two versions:  
-- **Python**: Easy to use and modify.  
-- **C**: Optimized for speed and large-scale processing.
+Simple tool to compress and organize multimedia files. Available in two versions:  
+- **Python**: Simple and customizable. 
+- **C**: High-performance for large-scale processing.
 
 **Example Usage (both versions):** 
 
@@ -15,7 +15,7 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
 
 **Modes:** 
 
-- **Retry Mode:** run via cmd with additional `-r` argument to retry compression for failed files (e.g. .\media_migration.exe -r).
+- **Retry Mode:** run via cmd with additional `-r` argument to retry compression for failed files
 - **Organize Mode:** run via cmd with additional `-o` argument to sort files into folders by creation year. **Beware**, files will be moved from existing folder structure to a new one. 
 
 ---
@@ -25,8 +25,7 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
 ### Python Version
 
 1. **Install Python**:  
-   - Download and install Python 3.8+ from [python.org](https://www.python.org/downloads/).  
-   - Ensure `python --version` works in your terminal.
+   - Download and install Python from [python.org](https://www.python.org/downloads/).  
 
 2. **Install Dependencies**:  
    - Open a terminal and run:  
@@ -56,7 +55,7 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
 
 1. **Install Build Tools**:  
    - **Windows** : Install [CMake](https://cmake.org/download/). Add to `PATH`.  
-   - **Linux** : Run `sudo apt update && sudo apt install cmake ninja-build git`.
+   - **Linux** : Run `sudo apt update && sudo apt install cmake`.
 
 2. **Install Dependencies**:  
    - **Windows** : Use `vcpkg` to install libraries, as `libexif` and `ffmpeg` lack full native support on Windows, requiring a dependency manager for prebuilt libraries:  
@@ -103,10 +102,7 @@ Simple tool to compress and organize multimedia files (photos and videos). Avail
        ```
      - **Linux** :  
        ```bash
-       mkdir build
-       cd build
-       cmake -G "Ninja" ..
-       cmake --build .
+       mkdir build && cd build && cmake .. && cmake --build .       
        ```  
    - Run the executable:  
      - **Windows** : `.\media_migration.exe C:\source C:\dest` (add `-r` or `-o` for modes)  

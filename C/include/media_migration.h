@@ -19,6 +19,9 @@
 extern "C" {
 #endif
 
+/// @brief Main function for the migration
+/// @param source_folder Folder containing original media
+/// @param destination_folder Folder where compressed media will be put 
 void run_media_migration(const char* src_dir, const char* src_log, const char* tgt_dir, int* processed, int* failed);
 
 #ifdef __cplusplus

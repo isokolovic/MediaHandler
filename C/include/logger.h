@@ -17,17 +17,22 @@ typedef enum{
 
 #define LOG_FILE_PATH "Log.log" //Log file name (and path!)
 
-void init_logger(const char* filename); 
-#ifdef __cplusplus
-extern "C" {
-#endif
+/// @brief Opens the log file and prepares the logger for use. 
+/// @param filename Path to the file
+void init_logger(const char* filename);
 
+/// @brief Handle messages logging
+/// @param level Info / Warning / Error
+/// @param format Custom message
 void log_message(LogLevel level, const char *format, ...);
 
-#ifdef __cplusplus
-}
-#endif
+/// @brief Closes the log file
+/// @param No param 
 void close_logger(void);
+
+/// @brief Log the file processing status - passed or failed (if user wants to retry failed compressions)
+/// @param file_path File path
+/// @param success Compression status
 void log_file_processing(const char* file_path, int success);
 
 /// @brief Function to capture errors during video compression

@@ -1,8 +1,5 @@
 #include "media_migration.h"
 
-/// @brief Main function for the migration
-/// @param source_folder Folder containing original media
-/// @param destination_folder Folder where compressed media will be put 
 void run_media_migration(const char* root_source, const char* source_folder, const char* destination_folder, int* processed, int* failed) {
     log_message(LOG_INFO, "Starting media migration with source: %s and destination %s", source_folder, destination_folder);
 #ifdef _WIN32

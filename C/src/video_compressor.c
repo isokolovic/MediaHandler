@@ -7,8 +7,6 @@
 #include <libexif/exif-data.h> 
 #include <png.h>
 
-/// @brief Releases all resources associated with a VideoCompressionContext
-/// @param ctx Pointer to the VideoCompressionContext structure
 void cleanup_video(VideoCompressionContext* ctx) {
 	if (ctx->pkt) av_packet_free(&ctx->pkt);
 	if (ctx->frame) av_frame_free(&ctx->frame);
@@ -30,13 +28,6 @@ void cleanup_video(VideoCompressionContext* ctx) {
 	if (ctx->in_ctx) avformat_close_input(&ctx->in_ctx);
 }
 
-/// @brief Writes a packet to an output format context, rescaling timestamps and stream indices
-/// @param out_ctx Pointer to the output AVFormatContext where the packet will be written
-/// @param pkt Pointer to the AVPacket to be written (its timestamps and stream index will be updated)
-/// @param in_stream Pointer to the input AVStream (used for timestamp rescaling)
-/// @param out_stream Pointer to the output AVStream (used for timestamp rescaling)
-/// @param stream_index Packet stream index
-/// @return True if the packet was written successfully
 bool write_packet(AVFormatContext* out_ctx, AVPacket* pkt, AVStream* in_stream, AVStream* out_stream, int stream_index) {
 	pkt->pts = av_rescale_q_rnd(pkt->pts, in_stream->time_base, out_stream->time_base, AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX);
 	pkt->dts = av_rescale_q_rnd(pkt->dts, in_stream->time_base, out_stream->time_base, AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX);
@@ -51,11 +42,6 @@ bool write_packet(AVFormatContext* out_ctx, AVPacket* pkt, AVStream* in_stream, 
 	return true;
 }
 
-/// @brief Processes a video frame using the specified compression context and input file.
-/// @param ctx Pointer to the video compression context
-/// @param filename Input file
-/// @param stream_index Index of the video stream
-/// @return True if the frame was processed successfully
 bool process_video_frame(VideoCompressionContext* ctx, const char* filename, int stream_index)
 {
 	//======Uncomment for detailed error logging (log frame parameters)======
@@ -158,10 +144,6 @@ bool process_video_frame(VideoCompressionContext* ctx, const char* filename, int
 	return true;
 }
 
-/// @brief Compress video file main function
-/// @param file Input video
-/// @param output_file Compressed video
-/// @return True if compression successful
 bool compress_video(const char* file, const char* output_file) {
 	VideoCompressionContext ctx = { 0 };
 	bool status = false;

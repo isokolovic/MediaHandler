@@ -9,10 +9,6 @@
 #include <libexif/exif-data.h>
 #include <png.h>
 
-/// @brief Libjpeg-turbo compression used for .jpg/.jpeg files
-/// @param file Input image
-/// @param output_file Compressed image
-/// @return True if compression successful
 bool compress_jpeg(const char* file, const char* output_file) {
 	FILE* in_file = NULL;
 	FILE* out_file = NULL;
@@ -114,10 +110,6 @@ cleanup:
 	return (buffer != NULL);  // Success if buffer allocated
 }
 
-/// @brief Libheif compression used for .heic files
-/// @param file Input image
-/// @param output_file Compressed image
-/// @return True if compression successful
 bool compress_heic(const char* file, const char* output_file) { //TODO add exif data
 	struct heif_context* context = NULL;
 	struct heif_image_handle* handle = NULL;
@@ -209,10 +201,6 @@ bool compress_heic(const char* file, const char* output_file) { //TODO add exif 
 	return true;
 }
 
-/// @brief Libpng compression used for .png files
-/// @param file Input image
-/// @param output_file Compressed image
-/// @return True if compression successful
 bool compress_png(const char* file, const char* output_file)
 {
 	png_structp png_read_ptr = NULL;
@@ -385,10 +373,6 @@ bool compress_png(const char* file, const char* output_file)
 	return true;
 }
 
-/// @brief Compress image file
-/// @param file Input image
-/// @param output_file Compressed image
-/// @return True if compression successful
 bool compress_image(const char* file, const char* output_file, const char* extension) {
     if (!file || !output_file || !extension) {
         log_message(LOG_ERROR, "Null input or output path in compress_image");

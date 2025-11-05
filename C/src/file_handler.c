@@ -34,18 +34,11 @@ static const char* special_chars = " %:/,\\{}~[]<>*?čćžđšČĆŽŠĐ";
 static const char* folder_special_chars = "%:/,.\\{}~[]<>*?čćžđšČĆŽŠĐ";
 
 #ifdef _WIN32
-/// @brief Check if provided path is a directory
-/// @param path Path provided by the user
-/// @return 1 if the path is a directory, 0 otherwise
 bool is_directory(const char* path){
     DWORD attrs = GetFileAttributesA(path);
     return (attrs != INVALID_FILE_ATTRIBUTES) && (attrs & FILE_ATTRIBUTE_DIRECTORY);
 }
-
 #else
-/// @brief Check if provided path is a directory for Linux OS
-/// @param path Path provided by the user
-/// @return 1 if the path is a directory, 0 otherwise
 bool is_directory(const char* path){
     struct stat st;
     if(stat(path, &st) != 0) return false;
@@ -53,9 +46,6 @@ bool is_directory(const char* path){
 }
 #endif
 
-/// @brief Check if file type is image
-/// @param filename Path to a file
-/// @return True if image
 bool is_image(const char* filename) {
     const char* extension = strrchr(filename, '.');
     if (!extension) return false;
@@ -65,9 +55,6 @@ bool is_image(const char* filename) {
     return false;
 }
 
-/// @brief Check if file type is video
-/// @param filename Path to a file
-/// @return True if video
 bool is_video(const char* filename) {
     const char* extension = strrchr(filename, '.');
     if (!extension) return false;
@@ -77,9 +64,6 @@ bool is_video(const char* filename) {
     return false;
 }
 
-/// @brief Check if file type is gif or other supported
-/// @param filename Path to a file
-/// @return True if gif or other supported type
 bool is_gif_misc(const char* filename) {
     const char* extension = strrchr(filename, '.');
     if (!extension) return false;
@@ -89,10 +73,6 @@ bool is_gif_misc(const char* filename) {
     return false;
 }
 
-/// @brief Copy file from the source to the destination
-/// @param source Copy source
-/// @param destination Copy destination
-/// @return True if copying is successful
 bool copy_file(const char* source, const char* destination) {
     FILE* source_file = fopen(source, "rb"); 
     if (!source_file) {
@@ -141,9 +121,6 @@ bool copy_file(const char* source, const char* destination) {
     return success;
 }
 
-/// @brief Create a directory
-/// @param path Directory to be created path
-/// @return True if successful
 bool create_directory(const char* path)
 {
     if (mkdir(path) == 0 || errno == EEXIST) return true;
@@ -182,18 +159,12 @@ bool create_directory(const char* path)
     return true;
 }
 
-/// @brief Check if file exist on specified path
-/// @param path Path to a file
-/// @return True if file exists
 bool file_exists(const char* path)
 {
     struct stat st;
     return stat(path, &st) == 0;
 }
 
-/// @brief Clean file / folder name of any special characters
-/// @param element Element to be cleaned
-/// @return Cleaned name, NULL if error, EMTPY_FILENAME if strlen(cleaned_element) == 0
 char* clean_name(const char* element, bool is_directory )
 {
     if (!element) {
@@ -238,9 +209,6 @@ char* clean_name(const char* element, bool is_directory )
     return cleaned_name;
 }
 
-/// @brief Extract relative path (subfolder)
-/// @param file_path Full file path
-/// @return Subfolder
 char* extract_relative_dir(const char* source_path, const char* file_path)
 {
     if (!source_path || !file_path) {
@@ -310,9 +278,6 @@ char* extract_relative_dir(const char* source_path, const char* file_path)
     return cleaned_dir;
 }
 
-/// @brief Get file size 
-/// @param path Path to a file
-/// @return File size
 long get_file_size(const char* path)
 {
     STAT_STRUCT st;
@@ -322,8 +287,6 @@ long get_file_size(const char* path)
     return -1;
 }
 
-/// @brief Check if source / destination folders are found upon user entry
-/// @param folder Path to the source / destination folder
 int get_valid_directory(const char* prompt, char* folder, size_t size) {
     //Prompt for a folder
     printf(prompt);
@@ -346,17 +309,10 @@ int get_valid_directory(const char* prompt, char* folder, size_t size) {
     return 0;
 }
 
-/// @brief Check if file needs to be processed
-/// @param filename File path
-/// @return True if file needs to be processed
 bool is_file_type_valid(const char* filename) {
     return is_image(filename) || is_video(filename) || is_gif_misc(filename);
 }
 
-/// @brief Main function for file compression
-/// @param file File to be compressed
-/// @param output_file Compressed file
-/// @return True if successful
 bool compress_file(const char* file, const char* output_file) {
     const char* extension = strrchr(file, '.');
 
@@ -381,12 +337,7 @@ bool compress_file(const char* file, const char* output_file) {
     return status;
 }
 
-/// @brief Function to parse LOG_FILE for failed files
-/// @param log_path Path to the LOG_FILE
-/// @param num_failed number of failed files (avoids looping through array to count elements)
-/// @return NULL-terminated array of file paths (strings) - handling variable-length lists of paths without fixed-size buffers
-char** get_failed_files_from_log(const char* log_path, int* num_failed)
-{
+char** get_failed_files_from_log(const char* log_path, int* num_failed) {
     FILE* log = fopen(log_path, "r");
     if (!log) {
         *num_failed = 0;
@@ -394,81 +345,65 @@ char** get_failed_files_from_log(const char* log_path, int* num_failed)
         return NULL;
     }
 
-    char** failed_files = NULL;//Dynamic array of strings
+    char** failed_files = NULL;
     int count = 0;
-    char line[1024];//Buffer for each line in the log
+    char line[1024];
 
     while (fgets(line, sizeof(line), log)) {
         const char* marker = "File Processing: ";
         const char* status_marker = " - FAILED";
 
-        // Find the start of the file path
         char* start = strstr(line, marker);
-        if (!start) continue;  //Skip lines without "File Processing:"
+        if (!start) continue;
+        start += strlen(marker);
 
-        start += strlen(marker); //Move pointer past the marker
-
-        //Find the end of the file path (before " - FAILED") and skip if status not "failed"
         char* end = strstr(start, status_marker);
         if (!end) continue;
 
         size_t len = end - start;
-        if (len <= 0 || len >= sizeof(line)) continue;  //Sanity check
+        if (len <= 0 || len >= sizeof(line)) continue;
 
-        //Copy exact substring and null-terminate it
         char file_path[512];
-        memcpy(file_path, start, len);  
+        memcpy(file_path, start, len);
         file_path[len] = '\0';
 
-        // Safely allocate space and store the path
+        // Extract just the filename from full path
+        const char* name = strrchr(file_path, '/');
+#ifdef _WIN32
+        if (!name) name = strrchr(file_path, '\\');
+#endif
+        name = name ? name + 1 : file_path;
 
-        char* temp = realloc(failed_files, (count + 1) * sizeof(char*));
-        if (!temp) {
-            for (int i = 0; i < count; ++i) free(failed_files[i]);
-            free(failed_files);
-            failed_files = NULL;
-            count = 0;
-            
-            log_message(LOG_ERROR, "Failed to realloc for failed files string array");
-            break;
-        }
-        failed_files = temp;
-
-        if (!failed_files[count]) {
+        char* new_entry = strdup(name);
+        if (!new_entry) {
+            log_message(LOG_ERROR, "Failed to strdup for failed file name");
             for (int i = 0; i < count; ++i) free(failed_files[i]);
             free(failed_files);
             *num_failed = 0;
+            fclose(log);
             return NULL;
         }
-        failed_files[count++] = strdup(file_path); //Store to current index and increment for next round
+
+        char** temp = realloc(failed_files, (count + 1) * sizeof(char*));
+        if (!temp) {
+            log_message(LOG_ERROR, "Failed to realloc for failed files array");
+            free(new_entry);
+            for (int i = 0; i < count; ++i) free(failed_files[i]);
+            free(failed_files);
+            *num_failed = 0;
+            fclose(log);
+            return NULL;
+        }
+
+        failed_files = temp;
+        failed_files[count++] = new_entry;
     }
 
     fclose(log);
-
-    // Null-terminate the array
-
-    char** temp = realloc(failed_files, (count + 1) * sizeof(char*));
-    if (!temp) {
-        log_message(LOG_ERROR, "Final realloc failed while null-terminating failed_files array");
-        for (int i = 0; i < count; ++i) free(failed_files[i]);
-        free(failed_files);
-        *num_failed = 0;
-        return NULL;
-    }
-    failed_files = temp;
-    failed_files[count] = NULL;
-
     *num_failed = count;
     return failed_files;
 }
 
-/// @brief Retry failed file processing attempts.
-/// @param root_source Source directory
-/// @param destination_folder Destination directory
-/// @param failed_files Array of failed file paths.
-/// @param num_failed Number of failed files
-/// @param total_processed Pointer to total processed counter
-/// @param total_failed Pointer to total failed counter
 void retry_failed_files(const char* root_source, const char* destination_folder, char** failed_files, int num_failed, int* total_processed, int* total_failed) {
     for (int i = 0; i < num_failed; i++) {
         log_message(LOG_INFO, "Retrying file: %s", failed_files[i]);
@@ -480,9 +415,6 @@ void retry_failed_files(const char* root_source, const char* destination_folder,
     }
 }
 
-/// @brief Returns the oldest timestamp year (creation or modification)
-/// @param path Full path to the file
-/// @return Year of oldest timestamp, or 0 on error
 int get_file_creation_year(const char* path)
 {
 #ifdef _WIN32
@@ -530,15 +462,7 @@ int get_file_creation_year(const char* path)
         return 0;
     }
 
-#if defined(__APPLE__)
-    time_t created = st.st_birthtime;
-#else
-    time_t created = 0; // Not available on Linux
-#endif
-    time_t modified = st.st_mtime;
-
-    time_t oldest = (created > 0 && created < modified) ? created : modified;
-
+    time_t oldest = st.st_mtime;
     struct tm* timeinfo = localtime(&oldest);
     if (!timeinfo) {
         log_message(LOG_ERROR, "Failed to convert timestamp for %s", path);
@@ -549,12 +473,6 @@ int get_file_creation_year(const char* path)
 #endif
 }
 
-/// @brief Move file to year-based folder
-/// @param root_source Root source folder
-/// @param destination_folder Destination base folder
-/// @param file_path File path
-/// @param year File creation year
-/// @return 1 on success, 0 on failure
 int move_file_to_year_folder(const char* root_source, const char* destination_folder, const char* file_path, int year)  //TODO remove root_source?
 {
     if (year <= 0) {
@@ -598,12 +516,6 @@ int move_file_to_year_folder(const char* root_source, const char* destination_fo
     return 1;
 }
 
-/// @brief Organize files by creation year
-/// @param root_source Root source folder
-/// @param source_folder Current folder to process
-/// @param destination_folder Destination base folder
-/// @param processed Pointer to processed counter
-/// @param failed Pointer to failed counter
 void organize_files(const char* root_source, const char* source_folder, const char* destination_folder, int* processed, int* failed)
 {
     log_message(LOG_INFO, "Organizing files in %s to %s", source_folder, destination_folder);
@@ -685,10 +597,6 @@ void organize_files(const char* root_source, const char* source_folder, const ch
 #endif
 }
 
-/// @brief Create folder if needed and copy compressed file to the destination
-/// @param root Root folder 
-/// @param destination_folder Destination folder
-/// @param file File to bo processed
 bool create_folder_process_file(const char* source_folder, const char* destination_folder, const char* filename)
 {
     if (!source_folder || !destination_folder || !filename) {
