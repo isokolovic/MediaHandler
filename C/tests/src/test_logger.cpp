@@ -18,7 +18,7 @@ protected: //Need access from GTests
 /// @param Logger class
 /// @param Test identifier
 TEST_F(LoggerTest, LogsMessages) {
-    init_logger(LOG_FILE);
+    init_logger(LOG_FILE, "r");
     log_message(LOG_INFO, "TEST INFO");
     log_message(LOG_ERROR, "TEST WARNING");
     log_message(LOG_ERROR, "TEST ERROR");
@@ -47,7 +47,7 @@ TEST_F(LoggerTest, LogsMessages) {
 /// @param Logger class
 /// @param Test identifier
 TEST_F(LoggerTest, ParsesFailedFiles) {
-    init_logger(LOG_FILE);
+    init_logger(LOG_FILE, "r");
     log_file_processing("C:/a.jpg", false);
     int n = 0;
     char** failed = get_failed_files_from_log(LOG_FILE, &n);

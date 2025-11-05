@@ -20,10 +20,10 @@ void log_file_processing(const char* file_path, int success)
 }
 
 
-void init_logger(const char* filename) {
-    log_file = fopen(filename, "w");
+void init_logger(const char* filename, const char* mode) {
+    log_file = fopen(filename, mode);
     if (!log_file) {
-        fprintf("Failed to open the log file %s\n", filename);
+        fprintf(stderr, "Failed to open the log file %s\n", filename);
     }
 }
 

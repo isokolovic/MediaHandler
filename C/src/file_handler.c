@@ -15,6 +15,7 @@
 #define STAT_STRUCT struct _stat
 #define STAT_FUNC _stat
 #define mkdir _mkdir
+#define PATH_SEPARATOR '\\'
 #else
 #include <strings.h>
 #include <unistd.h>
@@ -24,7 +25,10 @@
 #define STAT_STRUCT struct stat
 #define STAT_FUNC stat
 #define mkdir(path) mkdir(path, 0755)
+#define PATH_SEPARATOR '/'
 #endif
+
+#define PATH_MAX 4096
 
 static const char* image_extensions[] = { ".jpg", ".jpeg", ".heic", ".png", ".bmp" };
 static const char* video_extensions[] = { ".mp4", ".avi", ".mov"/*, ".3gp"*/ }; //3gp not supported currently (encoder compatibility)
@@ -216,13 +220,14 @@ char* extract_relative_dir(const char* source_path, const char* file_path)
         return NULL;
     }
 
-    //Normalize paths
+    // Normalize paths
     char normalized_source[1024];
     char normalized_file[1024];
-    strncpy(normalized_source, source_path, sizeof(normalized_source) - 2);
-    normalized_source[sizeof(normalized_source) - 2] = '\0';
+    strncpy(normalized_source, source_path, sizeof(normalized_source) - 1);
+    normalized_source[sizeof(normalized_source) - 1] = '\0';
     strncpy(normalized_file, file_path, sizeof(normalized_file) - 1);
     normalized_file[sizeof(normalized_file) - 1] = '\0';
+
 #ifdef _WIN32
     for (char* p = normalized_source; *p; p++) if (*p == '/') *p = '\\';
     for (char* p = normalized_file; *p; p++) if (*p == '/') *p = '\\';
@@ -231,51 +236,44 @@ char* extract_relative_dir(const char* source_path, const char* file_path)
     for (char* p = normalized_file; *p; p++) if (*p == '\\') *p = '/';
 #endif
 
+    // Ensure source ends with separator
     size_t source_len = strlen(normalized_source);
     if (source_len > 0 && normalized_source[source_len - 1] != '/' && normalized_source[source_len - 1] != '\\') {
 #ifdef _WIN32
-        strcat(normalized_source, "\\");
+        strncat(normalized_source, "\\", sizeof(normalized_source) - source_len - 1);
 #else
-        strcat(normalized_source, "/");
+        strncat(normalized_source, "/", sizeof(normalized_source) - source_len - 1);
 #endif
         source_len++;
     }
 
-    size_t file_len = strlen(normalized_file);
-    if (file_len < source_len || strncmp(normalized_file, normalized_source, source_len) != 0) {
+    // Check if file path starts with source path
+    if (strncmp(normalized_file, normalized_source, source_len) != 0) {
         log_message(LOG_WARNING, "File %s is not under source %s", normalized_file, normalized_source);
-        return strdup("");
+        return strdup(""); // Return empty string to indicate root fallback
     }
 
-    // Extract relative path up to the last directory
-    const char* relative_path = normalized_file + source_len;
-    const char* last_sep = strrchr(relative_path, '/');
-    if (!last_sep) last_sep = strrchr(relative_path, '\\');
-    if (!last_sep) {
-        return strdup(""); // No subdirectory
+    // Extract relative path
+    const char* relative = normalized_file + source_len;
+    char* subdir = strdup(relative);
+    if (!subdir) {
+        log_message(LOG_ERROR, "Memory allocation failed in extract_relative_dir");
+        return NULL;
     }
 
-    size_t relative_len = (size_t)(last_sep - relative_path);
-    char* relative_dir = malloc(relative_len + 1);
-    if (!relative_dir) {
-        log_message(LOG_ERROR, "Memory allocation for relative_dir failed");
-        return strdup("");
-    }
+    // Remove filename from relative path
+    char* last_sep =
 #ifdef _WIN32
-    strncpy_s(relative_dir, relative_len + 1, relative_path, relative_len);
+        strrchr(subdir, '\\');
+    if (!last_sep) last_sep = strrchr(subdir, '/');
 #else
-    strncpy(relative_dir, relative_path, relative_len);
-    relative_dir[relative_len] = '\0';
+        strrchr(subdir, '/');
+    if (!last_sep) last_sep = strrchr(subdir, '\\');
 #endif
 
-    // Clean the relative path
-    char* cleaned_dir = clean_name(relative_dir, true);
-    free(relative_dir);
-    if (!cleaned_dir) {
-        log_message(LOG_ERROR, "Failed to clean relative directory %s", relative_path);
-        return strdup("");
-    }
-    return cleaned_dir;
+    if (last_sep) *last_sep = '\0'; // Truncate at last separator
+
+    return subdir;
 }
 
 long get_file_size(const char* path)
@@ -405,12 +403,25 @@ char** get_failed_files_from_log(const char* log_path, int* num_failed) {
 }
 
 void retry_failed_files(const char* root_source, const char* destination_folder, char** failed_files, int num_failed, int* total_processed, int* total_failed) {
+    char full_path[PATH_MAX];
+
     for (int i = 0; i < num_failed; i++) {
-        log_message(LOG_INFO, "Retrying file: %s", failed_files[i]);
+        // Ensure proper path concatenation
+        size_t root_len = strlen(root_source);
+        int needs_separator = (root_len > 0 && root_source[root_len - 1] != PATH_SEPARATOR);
+
+        if (needs_separator) {
+            snprintf(full_path, sizeof(full_path), "%s%c%s", root_source, PATH_SEPARATOR, failed_files[i]);
+        }
+        else {
+            snprintf(full_path, sizeof(full_path), "%s%s", root_source, failed_files[i]);
+        }
+
+        log_message(LOG_INFO, "Retrying file: %s", full_path);
         (*total_processed)++;
 
-        if (!create_folder_process_file(root_source, destination_folder, failed_files[i])) {
-            (*total_failed)++;  
+        if (!create_folder_process_file(root_source, destination_folder, full_path)) {
+            (*total_failed)++;
         }
     }
 }
@@ -595,6 +606,30 @@ void organize_files(const char* root_source, const char* source_folder, const ch
 
     closedir(dir);
 #endif
+}
+
+bool extract_path_from_log(const char* source_target, char* out_path, size_t max_len)
+{
+    FILE* file = fopen(LOG_FILE_PATH, "r");
+    if (!file) return false;
+
+    char line[1024];
+    while (fgets(line, sizeof(line), file)) {
+        char* match = strstr(line, source_target);
+        if (match) {
+            const char* value = match + strlen(source_target);
+            size_t len = strcspn(value, "\r\n");
+            if (len >= max_len) len = max_len - 1;
+
+            strncpy(out_path, value, len);
+            out_path[len] = '\0';
+            fclose(file);
+            return true;
+        }
+    }
+
+    fclose(file);
+    return false;
 }
 
 bool create_folder_process_file(const char* source_folder, const char* destination_folder, const char* filename)

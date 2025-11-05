@@ -19,7 +19,8 @@ typedef enum{
 
 /// @brief Opens the log file and prepares the logger for use. 
 /// @param filename Path to the file
-void init_logger(const char* filename);
+/// @param mode "a" (preserve log) or "r" (clean log)
+void init_logger(const char* filename, const char* mode);
 
 /// @brief Handle messages logging
 /// @param level Info / Warning / Error

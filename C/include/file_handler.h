@@ -129,6 +129,13 @@ int move_file_to_year_folder(const char* root_source, const char* destination_fo
 /// @param failed Pointer to failed counter
 void organize_files(const char* root_source, const char* source_folder, const char* destination_folder, int* processed, int* failed);
 
+/// @brief Extracts a path value from the log file
+/// @param source_target "SOURCE_DIR=" or "TARGET_DIR="
+/// @param out_path Extracted path
+/// @param max_len Max length of the output buffer
+/// @return True if the path was successfully extracted
+bool extract_path_from_log(const char* source_target, char* out_path, size_t max_len);
+
 #ifdef __cplusplus
 }
 #endif

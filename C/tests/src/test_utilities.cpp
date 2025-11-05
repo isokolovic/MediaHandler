@@ -20,8 +20,6 @@ const char* TARGET_DIR = "";
 
 const char* LOG_FILE = LOG_FILE_PATH; 
 
-/// @brief Ensure target directory exists
-/// @return True if exists / created
 bool ensure_target_dir() {
 	if (is_directory(TARGET_DIR)) {
 		return true;
@@ -29,7 +27,6 @@ bool ensure_target_dir() {
 	return create_directory(TARGET_DIR);	
 }
 
-/// @brief Cleanup target directory after test run
 void cleanup_target_dir() {
 #ifdef _WIN32
 	char search_path[4096]; 
@@ -68,9 +65,6 @@ void cleanup_target_dir() {
 #endif
 }
 
-/// @brief Read log file content
-/// @param path Log file path
-/// @return Log file stringstream
 std::string read_log_content(const char* path) {
 	std::ifstream f(path);
 	if (!f) return "";
@@ -79,16 +73,11 @@ std::string read_log_content(const char* path) {
 	return s.str();
 }
 
-/// @brief Lot the outcome of logging test
-/// @param name Test identifier
-/// @param pass Test
 void log_test_outcome(const char* name, bool pass)
 {
 	log_message(pass ? LOG_INFO : LOG_ERROR, "Test %s: %s", name, pass ? "PASSED" : "FAILED");
 }
 
-/// @brief Cout files in target directory
-/// @return Number of files
 int count_valid_outputs() {
 	int count = 0;
 
@@ -122,9 +111,6 @@ int count_valid_outputs() {
 	return count;
 }
 
-/// @brief List files in target directory and subdirectories
-/// @param dir Parent target directory
-/// @return Vector of filenames
 std::vector<std::string> list_files_in_dir(const char* dir) {
 	std::vector<std::string> files;
 
@@ -173,9 +159,6 @@ std::vector<std::string> list_files_in_dir(const char* dir) {
 	return files;
 }
 
-
-/// @brief Discover files in source directory
-/// @return Vector of source files
 std::vector<std::string> discover_source_files() {
 	std::vector<std::string> files;
 
@@ -205,10 +188,6 @@ std::vector<std::string> discover_source_files() {
 	return files;
 }
 
-/// @brief Creates a mock log file from files in source directory
-/// @param filename File to be logged as failed
-/// @brief Appends a mock FAILED entry to the log file for testing retry logic.
-/// @param filename File to be logged as failed (relative to SOURCE_DIR).
 void create_mock_log(const char* filename) {
 	FILE* log = fopen(LOG_FILE, "a");
 	if (!log) {
@@ -224,37 +203,22 @@ void create_mock_log(const char* filename) {
 	fclose(log);
 }
 
-/// @brief Get full target dir file path
-/// @param file_name File name
-/// @return Full file path
 char* get_output_path(const char* file_name) {
 	char* path = (char*)malloc(4096);
 	snprintf(path, 4096, "%s/%s", TARGET_DIR, file_name);
 	return path;
 }
 
-/// @brief Check if file is compressed
-/// @param in_file Input file
-/// @param out_file Output file
-/// @return True if output is smaller than input
 bool is_compressed_smaller(const char* in_file, const char* out_file) {
 	long in = get_file_size(in_file), out = get_file_size(out_file);
 	return out > 0 && out < in;
 }
 
-/// @brief Check if file is copied
-/// @param in_file Input file
-/// @param out_file Output file
-/// @return True if output file size is equal to input file
 bool is_compressed_equal(const char* in_file, const char* out_file) {
 	long in = get_file_size(in_file), out = get_file_size(out_file);
 	return out > 0 && out == in;
 }
 
-/// @brief Check if target file path is put to correct year in dest folder
-/// @param target_dir Target directory
-/// @param file_path Source file
-/// @return True if file is put to correct sub-folder
 bool file_in_correct_year_folder(const char* target_dir, const char* file_path)
 {
 	int file_creation_year = get_file_creation_year(file_path);
@@ -278,9 +242,6 @@ bool file_in_correct_year_folder(const char* target_dir, const char* file_path)
 #endif
 }
 
-/// @brief List subdirectories in tarted dir
-/// @param dir target dir
-/// @return Subdirectories
 std::vector<std::string> list_subdirs_in_dir(const char* dir) {
 	std::vector<std::string> subdirs;
 
