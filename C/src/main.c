@@ -1,4 +1,5 @@
 #include "media_migration.h"
+#include <time.h>  
 
 int main(int argc, char* argv[]) {
     bool retry_mode = false;
@@ -15,7 +16,11 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    init_logger(LOG_FILE_PATH, retry_mode ? "a" : "r");
+    init_logger(LOG_FILE_PATH, retry_mode ? "a" : "w");
+
+    // Track start time
+    time_t start_time = time(NULL);
+    log_message(LOG_INFO, "Migration started at: %s", ctime(&start_time));
 
     if (argc > 1 && !retry_mode && !organize_mode) {
         log_message(LOG_ERROR, "Invalid argument: %s. Use -r for retry or -o for organize.", argv[1]);
@@ -51,21 +56,21 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    //Processed files counters: 
-    int processed = 0; 
-    int failed = 0; 
-        
+    // Processed files counters: 
+    int processed = 0;
+    int failed = 0;
+
     if (retry_mode) {
         int num_failed = 0;
         char** failed_files = get_failed_files_from_log(LOG_FILE_PATH, &num_failed);
 
         if (num_failed > 0 && failed_files) {
-            //Clean log before retry
+            // Clean log before retry
             FILE* log = fopen(LOG_FILE_PATH, "w");
             if (log) fclose(log);
 
             retry_failed_files(source_folder, destination_folder, failed_files, num_failed, &processed, &failed);
-            
+
             // Free the list
             for (int i = 0; i < num_failed; i++) {
                 free(failed_files[i]);
@@ -80,8 +85,16 @@ int main(int argc, char* argv[]) {
         organize_files(source_folder, source_folder, destination_folder, &processed, &failed);
     }
     else {
-        run_media_migration(source_folder, source_folder, destination_folder, &processed, &failed); 
+        run_media_migration(source_folder, source_folder, destination_folder, &processed, &failed);
     }
+
+    // Track end time
+    time_t end_time = time(NULL);
+    log_message(LOG_INFO, "Migration ended at: %s", ctime(&end_time));
+
+    // Calculate duration
+    double duration = difftime(end_time, start_time);
+    log_message(LOG_INFO, "Total duration: %.2f seconds", duration);
 
     close_logger();
     log_summary(processed, failed);

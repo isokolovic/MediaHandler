@@ -9,7 +9,7 @@ protected:
 
     void SetUp() override {
         ASSERT_TRUE(ensure_target_dir());
-        init_logger(LOG_FILE, "r");
+        init_logger(LOG_FILE, "w");
         files = discover_source_files();
         ASSERT_FALSE(files.empty()) << "No media in " << SOURCE_DIR;
     }

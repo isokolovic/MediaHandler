@@ -5,7 +5,7 @@ class MigrationTest : public ::testing::Test {
 protected:
     void SetUp() override { 
         ASSERT_TRUE(ensure_target_dir()); 
-        init_logger(LOG_FILE, "r");
+        init_logger(LOG_FILE, "w");
     }
     void TearDown() override { 
         close_logger(); 
