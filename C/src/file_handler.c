@@ -626,115 +626,137 @@ bool extract_path_from_log(const char* source_target, char* out_path, size_t max
     return false;
 }
 
-bool create_folder_process_file(const char* source_folder, const char* destination_folder, const char* filename)
-{
+bool create_folder_process_file(const char* source_folder, const char* destination_folder, const char* filename){
     if (!source_folder || !destination_folder || !filename) {
         log_message(LOG_ERROR, "NULL parameter in create_folder_process_file");
         return false;
     }
 
-    char* base_filename = strrchr(filename, '/');
+    bool success = false;
+
+    // Values on heap
+    char* destination_dir = malloc(PATH_MAX);
+    char* destination_path = malloc(PATH_MAX);
+    char* temp_file = malloc(PATH_MAX);
+    char* temp_name = malloc(PATH_MAX);
+    if (!destination_dir || !destination_path || !temp_file || !temp_name) {
+        log_message(LOG_ERROR, "malloc failed for path buffers");
+        free(destination_dir); free(destination_path);
+        free(temp_file); free(temp_name);
+        return false;
+    }
+
+    const char* base_filename = strrchr(filename, '/');
     if (!base_filename) base_filename = strrchr(filename, '\\');
-    if (!base_filename) base_filename = (char*)filename;
-    else base_filename++; //Increase pointer past the separator
+    base_filename = base_filename ? base_filename + 1 : filename;
 
     char* clean_filename = clean_name(base_filename, false);
     if (!clean_filename) {
-        log_message(LOG_ERROR, "Failed to clean filename %s", base_filename);
-        return false;
+        log_message(LOG_ERROR, "clean_name failed for filename");
+        goto cleanup;
     }
 
-    //Extract relative path 
+    // Relative sudirectory
     char* subdirectory = extract_relative_dir(source_folder, filename);
     if (!subdirectory) {
-        log_message(LOG_ERROR, "Failed to extract subdirectory for %s", filename);
-        free(clean_filename); //malloc used in clean_name()
-        return false;
+        log_message(LOG_ERROR, "extract_relative_dir failed");
+        free(clean_filename);
+        goto cleanup;
     }
 
-    //Create destination directory
-    char destination_dir[1024];
+    // Destination directory
     if (strlen(subdirectory) > 0) {
-#ifdef _WIN32
-        snprintf(destination_dir, sizeof(destination_dir), "%s\\%s", destination_folder, subdirectory);
-#else
-        snprintf(destination_dir, sizeof(destination_dir), "%s/%s", destination_folder, subdirectory);
-#endif 
+        snprintf(destination_dir, PATH_MAX, "%s%c%s",
+            destination_folder, PATH_SEPARATOR, subdirectory);
     }
     else {
-        strncpy(destination_dir, destination_folder, sizeof(destination_dir) - 1);
-        destination_dir[sizeof(destination_dir) - 1] = '\0';
+        strncpy(destination_dir, destination_folder, PATH_MAX - 1);
+        destination_dir[PATH_MAX - 1] = '\0';
     }
     free(subdirectory);
 
     if (!create_directory(destination_dir)) {
-        log_message(LOG_ERROR, "Failed to create destination directory %s", destination_dir);
-        free(clean_filename); //malloc used in clean_name()
-        return false;
+        log_message(LOG_ERROR, "create_directory failed: %s", destination_dir);
+        free(clean_filename);
+        goto cleanup;
     }
 
-    //Create a file path and make a copy on the destination location
-    char destination_path[1024];
-#ifdef _WIN32
-    snprintf(destination_path, sizeof(destination_path), "%s\\%s", destination_path, clean_filename);
-#else
-    snprintf(destination_path, sizeof(destination_path), "%s/%s", destination_path, clean_filename);
-#endif
+    // Final clean destination path
+    snprintf(destination_path, PATH_MAX, "%s%c%s", destination_dir, PATH_SEPARATOR, clean_filename);
 
-    const char* last_step = strrchr(filename, '\\');
-    if (!last_step) last_step = strrchr(filename, '/');
-    const char* raw_filename = last_step ? last_step + 1 : filename;
-
-    const char* extension = strrchr(raw_filename, '.'); //Find the extension
-    char base_name[512];
-    if (extension && extension != raw_filename) {
-        size_t base_len = (size_t)(extension - raw_filename);
-        snprintf(base_name, sizeof(base_name), "%.*s", (int)base_len, raw_filename);
-    }
-    else {
-        extension = NULL;
-        snprintf(base_name, sizeof(base_name), "%s", raw_filename);
-    }
-    char* clean_basename = clean_name(base_name, false);
-    if (!clean_basename) {
-        log_message(LOG_ERROR, "Failed to clean basename");
-        return false;
-    }
-
-    //Create path of temporary copy to be compressed 
-    char temp_filename[1024];
-    if (extension) {
-        snprintf(temp_filename, sizeof(temp_filename), "%s%s", clean_basename, extension);
-    }
-    else {
-        snprintf(temp_filename, sizeof(temp_filename), "%s", clean_basename);
-    }
-    free(clean_basename);
-
-    //Copy file to the destination path
-    char temp_file[1024];
-#ifdef _WIN32
-    snprintf(temp_file, sizeof(temp_file), "%s\\%s", destination_dir, temp_filename);
-#else
-    snprintf(temp_file, sizeof(temp_file), "%s/%s", destination_dir, temp_filename);
-#endif 
-
+    // Skip if already compressed
     if (file_exists(destination_path)) {
-        long file_size = get_file_size(filename);
-        long file_copy_size = get_file_size(destination_path);
-
-        if (file_size > file_copy_size) {
-            log_message(LOG_WARNING, "Compressed copy already exists at the location %s", destination_path);
-            return false;
+        long src = get_file_size(filename);
+        long dst = get_file_size(destination_path);
+        if (src > 0 && dst > 0 && dst < src) {log_message(LOG_INFO, "Already compressed (%ld→%ld): %s", src, dst, destination_path);
+            free(clean_filename);
+            goto cleanup;
         }
     }
 
-    if (!copy_file(filename, temp_file)) {
-        log_message(LOG_ERROR, "Failed to create temporary file copy for %s", temp_file);
-        free(clean_filename);
-        return false;
+    // Dest filename: clean base + extension
+    const char* raw = base_filename;
+    const char* ext = strrchr(raw, '.');
+    char base_no_ext[512];
+    if (ext && ext != raw) {
+        snprintf(base_no_ext, sizeof(base_no_ext), "%.*s", (int)(ext - raw), raw);    
+    }
+    else {
+        ext = NULL;
+        strncpy(base_no_ext, raw, sizeof(base_no_ext) - 1);
+        base_no_ext[sizeof(base_no_ext) - 1] = '\0';
     }
 
-    //Compress the file copy
-    return compress_file(filename, temp_file);
+    char* clean_base = clean_name(base_no_ext, false);
+    if (!clean_base) {
+        log_message(LOG_ERROR, "clean_name failed for basename");
+        free(clean_filename);
+        goto cleanup;
+    }
+
+    if (ext) {
+        snprintf(temp_name, PATH_MAX, "%s%s", clean_base, ext);
+    }
+    else {
+        strncpy(temp_name, clean_base, PATH_MAX - 1);
+        temp_name[PATH_MAX - 1] = '\0';
+    }
+    free(clean_base);
+
+    // Dest full path
+    snprintf(temp_file, PATH_MAX, "%s%c%s",
+        destination_dir, PATH_SEPARATOR, temp_name);
+
+    // Copy source to target
+    if (!copy_file(filename, temp_file)) {
+        log_message(LOG_ERROR, "copy failed: %s → %s", filename, temp_file);
+        free(clean_filename);
+        goto cleanup;
+    }
+
+    success = compress_file(filename, temp_file);
+
+    if (success) {
+        if (rename(temp_file, destination_path) == 0) {
+            log_message(LOG_INFO, "Compressed: %s", destination_path);
+        }
+        else {
+            log_message(LOG_ERROR, "rename failed: %s → %s",
+                temp_file, destination_path);
+            success = false;
+        }
+    }
+    else {
+        log_message(LOG_WARNING, "Compression failed, saving original");
+        rename(temp_file, destination_path);  
+    }
+
+    free(clean_filename);
+
+cleanup:
+    free(destination_dir);
+    free(destination_path);
+    free(temp_file);
+    free(temp_name);
+    return success;
 }
