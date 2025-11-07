@@ -15,7 +15,7 @@ Simple tool to compress and organize multimedia files. Available in two versions
 
 **Modes:** 
 
-- **Retry Mode:** run via cmd with additional `-r` argument to retry compression for failed files
+- **Retry Mode:** run via cmd with additional `-r` argument to retry compression for failed files  
 - **Organize Mode:** run via cmd with additional `-o` argument to sort files into folders by creation year. **Beware**, files will be moved from existing folder structure to a new one. 
 
 ---
@@ -37,15 +37,15 @@ Simple tool to compress and organize multimedia files. Available in two versions
      - **Linux**: Run `sudo apt update && sudo apt install ffmpeg`.
 
 3. **Run the Script**:  
-   - Save the script
+   - Save the script  
    - In a terminal, navigate to the script’s folder:  
      ```bash
      cd path/to/script/folder
      ```  
    - Run the script with source and destination folders:  
      ```bash
-     python media_handler.py C:\source C:\dest  # Windows
-     python media_handler.py /source /dest      # Linux
+     python media_handler.py C:\source C:\dest  # Windows  
+     python media_handler.py /source /dest      # Linux  
      ```  
    - The script compresses files and moves them to `destination_folder`, preserving the folder structure.
 
@@ -61,49 +61,56 @@ Simple tool to compress and organize multimedia files. Available in two versions
    - **Windows** : Use `vcpkg` to install libraries, as `libexif` and `ffmpeg` lack full native support on Windows, requiring a dependency manager for prebuilt libraries:  
      - Install `vcpkg`:  
        ```cmd
-       cd C:\
-       git clone https://github.com/microsoft/vcpkg.git
-       cd vcpkg
-       .\bootstrap-vcpkg.bat
-       ```
-       - Add vcpkg to `PATH`
+       cd C:\  
+       git clone https://github.com/microsoft/vcpkg.git  
+       cd vcpkg  
+       .\bootstrap-vcpkg.bat  
+       ```  
+       - Add vcpkg to `PATH`  
        ```cmd
-       Edit environment variables -> Add vcpkg root folder to `PATH` (e.g. C:\vcpkg)
+       Edit environment variables -> Add vcpkg root folder to `PATH` (e.g. C:\vcpkg)  
        ```
 
      - Install dependencies:  
        ```cmd
-       vcpkg install libjpeg-turbo:x64-windows-static libheif:x64-windows-static libexif:x64-windows-static ffmpeg:x64-windows-static libpng:x64-windows
-       vcpkg integrate install
+       vcpkg install libjpeg-turbo:x64-windows-static libheif:x64-windows-static libexif:x64-windows-static ffmpeg:x64-windows-static libpng:x64-windows  
+       vcpkg integrate install  
        ```  
      - For more on `vcpkg`, see [Microsoft’s documentation](https://learn.microsoft.com/en-us/vcpkg/) or the [GitHub repository](https://github.com/microsoft/vcpkg).  
    - **Linux**: Run:  
      ```bash
-     sudo apt install libjpeg-dev libheif-dev libexif-dev libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libpng-dev
+     sudo apt install libjpeg-dev libheif-dev libexif-dev libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libpng-dev  
      ```
 
 3. **Build and Run**:  
-   - Save the source files
+   - Save the source files  
    - In a terminal, navigate to the project folder:  
      ```bash
-     cd path/to/project/folder
+     cd path/to/project/folder  
      ```  
    - Build the project:  
      - **Windows** :  
        ```cmd
-       mkdir build
-       cd build
-       cmake ..
-       cmake --build .
-       ```
-     - Hint:
-        ```cmd
-        If using Visual Studio, make sure you configure Runtime Library to be Multi-threaded DLL (/MD), ensuring executable will rely on the system-installed DLLs.  (Properties / Configuration Properties / C/C++ / Code Generation / Runtime Library)
-       ```
+       mkdir build  
+       cd build  
+       cmake ..  
+       cmake --build .  
+       ```  
+     - Hint:  
+       ```cmd
+       If using Visual Studio, make sure you configure Runtime Library to be Multi-threaded DLL (/MD), ensuring executable will rely on the system-installed DLLs.  
+       (Properties / Configuration Properties / C/C++ / Code Generation / Runtime Library)  
+       ```  
      - **Linux** :  
        ```bash
-       mkdir build && cd build && cmake .. && cmake --build .       
+       mkdir build && cd build && cmake .. && cmake --build .  
        ```  
    - Run the executable:  
-     - **Windows** : `.\media_migration.exe C:\source C:\dest` (add `-r` or `-o` for modes)  
-     - **Linux** : `./media_migration /source /dest` (add `-r` or `-o` for modes)
+     - **Windows** :  
+       ```cmd
+       .\media_migration.exe C:\source C:\dest [-r | -o]  
+       ```  
+     - **Linux** :  
+       ```bash
+       ./media_migration /source /dest [-r | -o]  
+       ```
