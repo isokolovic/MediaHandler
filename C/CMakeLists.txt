@@ -11,7 +11,7 @@ enable_testing()
 # Shared source files
 set(MEDIA_CORE_SOURCES
     src/file_handler.c
-    src/media_migration.c
+    src/media_migration.cpp
     src/logger.c
     src/image_compressor.c
     src/video_compressor.c
