@@ -1,8 +1,8 @@
-﻿__pycache__/
-*/out/
-*/out_linux/
-*/.vs/
-*/.vscode/
-/.vs/
-*.log
-*/build/
+.vs/
+bin/
+obj/
+build/
+x64/
+out/
+*.zip
+*.7z
