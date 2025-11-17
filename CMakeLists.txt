@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 3.26)
-
 project(MediaHandler LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -14,14 +13,16 @@ endif()
 
 # Find packages
 find_package(unofficial-libexif CONFIG REQUIRED)
+find_package(spdlog CONFIG REQUIRED)
+find_package(CLI11 CONFIG REQUIRED)
 
 # Executable
 add_executable(${PROJECT_NAME})
-
 target_sources(${PROJECT_NAME}
     PRIVATE
         src/main.cpp
-)
+        src/utils/logger.cpp
+ )
 
 target_include_directories(${PROJECT_NAME}
     PRIVATE
@@ -32,6 +33,8 @@ target_include_directories(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
         unofficial::libexif::libexif
+        spdlog::spdlog
+        CLI11::CLI11
 )
 
 # IDE folder grouping

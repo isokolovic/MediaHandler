@@ -2,6 +2,8 @@
   "name": "media-handler",
   "version-string": "1.0.0",
   "dependencies": [
-    "libexif"
+    "libexif",
+    "spdlog",
+    "cli11"
   ]
 }
