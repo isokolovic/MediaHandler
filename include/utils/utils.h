@@ -4,11 +4,11 @@
 #include <string>
 
 namespace media_handler::utils {
+	inline std::string log_dir = "logs";
 
 	/// @brief Wrapper for spdlog logger creation
     class Logger {
-    public:
-        
+    public:        
         /// @brief Creates async logger txt format
         /// @param name Logger name
 		/// @param level Log level

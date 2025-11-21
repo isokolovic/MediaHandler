@@ -39,3 +39,30 @@ target_link_libraries(${PROJECT_NAME}
 
 # IDE folder grouping
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+# Tests
+option(BUILD_TESTS "Build unit tests" ON)
+if(BUILD_TESTS)
+    enable_testing()
+    find_package(GTest CONFIG REQUIRED)
+    find_package(nlohmann_json CONFIG REQUIRED)
+
+    add_executable(media_handler_tests
+        tests/test_logger.cpp
+        src/utils/logger.cpp
+    )
+
+    target_include_directories(media_handler_tests
+        PRIVATE
+            ${PROJECT_SOURCE_DIR}/include
+    )
+
+    target_link_libraries(media_handler_tests
+        PRIVATE
+            GTest::gtest_main
+            spdlog::spdlog
+            nlohmann_json::nlohmann_json # For json parsing 
+    )
+
+    add_test(NAME media_handler_tests COMMAND media_handler_tests)
+endif()

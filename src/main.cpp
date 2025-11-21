@@ -1,10 +1,10 @@
-#include<utils/utils.h>
 #include <CLI/CLI.hpp>
 #include <thread>
 #include <future>
 #include <vector>
 #include <iostream>
 #include <chrono>
+#include<utils/utils.h>
 
 int main(int argc, char** argv){
 	CLI::App app{ "Media Handler" };
