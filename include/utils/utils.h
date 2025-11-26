@@ -25,5 +25,4 @@ namespace media_handler::utils {
 		/// @brief Flush all loggers
 		static void flush_all();
     };
-
-}
+} //namespace media_handler::utils

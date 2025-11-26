@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.26)
 project(MediaHandler LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -21,6 +21,7 @@ add_executable(${PROJECT_NAME})
 target_sources(${PROJECT_NAME}
     PRIVATE
         src/main.cpp
+        src/utils/config.cpp
         src/utils/logger.cpp
  )
 
@@ -48,12 +49,16 @@ if(BUILD_TESTS)
     find_package(nlohmann_json CONFIG REQUIRED)
 
     add_executable(media_handler_tests
+        tests/test_common.cpp
+        tests/test_config.cpp
         tests/test_logger.cpp
+        src/utils/config.cpp
         src/utils/logger.cpp
     )
 
     target_include_directories(media_handler_tests
         PRIVATE
+            ${PROJECT_SOURCE_DIR}/tests
             ${PROJECT_SOURCE_DIR}/include
     )
 

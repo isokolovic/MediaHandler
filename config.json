@@ -1,0 +1,20 @@
+{
+  "video": {
+    "codec": "libx264",
+    "preset": "fast",
+    "crf": "19",
+    "maxrate": "15M",
+    "bufsize": "30M"
+  },
+  "audio": {
+    "codec": "aac",
+    "bitrate": "256k"
+  },
+  "general": {
+    "container": "mp4",
+    "output_dir": "output",
+    "threads": 12,
+    "json_log": true,
+    "log_level": "debug"
+  }
+}
