@@ -2,12 +2,11 @@
 #include <gtest/gtest.h>
 #include <filesystem>
 #include <string>
-
-namespace fs = std::filesystem;
+#include <utils/utils.h>
 
 class TestCommon : public ::testing::Test {
 protected:
-    fs::path test_dir;
+    std::filesystem::path test_dir;
 
 	/// @brief Initialize fixture before each test
     void SetUp() override;
@@ -15,5 +14,5 @@ protected:
     void TearDown() override;
 
 	/// @brief Get full path to a file in the test temp directory
-    fs::path path(const std::string& filename) const;
+    std::filesystem::path path(const std::string& filename) const;
 };

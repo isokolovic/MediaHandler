@@ -8,16 +8,17 @@ void TestCommon::SetUp() {
     const auto* info = ::testing::UnitTest::GetInstance()->current_test_info();
     std::string test_name = info ? info->name() : "unknown";
 
-    test_dir = fs::temp_directory_path() /
+    test_dir = std::filesystem::temp_directory_path() /
         ("media_handler_test_" + std::to_string(now) + "_" + test_name);
 
-    fs::create_directories(test_dir);
+    std::filesystem::create_directories(test_dir);
+    media_handler::utils::log_dir = test_dir.string();
 }
 
 void TestCommon::TearDown() {
     try {
         if (!test_dir.empty()) {
-            fs::remove_all(test_dir);
+            std::filesystem::remove_all(test_dir);
         }
     }
     catch (...) {
@@ -25,6 +26,6 @@ void TestCommon::TearDown() {
     }
 }
 
-fs::path TestCommon::path(const std::string& filename) const {
+std::filesystem::path TestCommon::path(const std::string& filename) const {
     return test_dir / filename;
 }

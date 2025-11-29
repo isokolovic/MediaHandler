@@ -8,34 +8,12 @@
 #include <string>
 #include <nlohmann/json.hpp>
 #include "utils/utils.h"
+#include "test_common.h"
 
-class LoggerTest : public ::testing::Test {
+class LoggerTest : public TestCommon {
 protected:
-	std::filesystem::path test_log_dir;
-
 	void SetUp() override {
-		// Create a unique log directory for each test
-		auto now = std::chrono::system_clock::now().time_since_epoch();
-		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
-
-		test_log_dir = std::filesystem::temp_directory_path() /
-			("media_handler_test_" + std::to_string(ms) + "_" +
-				::testing::UnitTest::GetInstance()->current_test_info()->name());
-
-		std::filesystem::create_directories(test_log_dir);
-
-		media_handler::utils::log_dir = test_log_dir.string();
-	}
-
-	void TearDown() override {
-		// Flush all loggers after each test and remove test log directory
-		media_handler::utils::Logger::flush_all();
-		try {
-			std::filesystem::remove_all(test_log_dir);
-		}
-		catch (...) {
-			// Ignore errors during cleanup
-		}
+		TestCommon::SetUp();
 	}
 
 	/// @brief Return content as string
@@ -62,7 +40,7 @@ TEST_F(LoggerTest, CreateTxtLogger) {
 	//avoid race condition on file write and read
 	std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
 
-	std::string log_content = read_file((test_log_dir / "media_handler.log").string());
+	std::string log_content = read_file((test_dir / "media_handler.log").string());
 
 	ASSERT_NE(log_content.find(info_msg), std::string::npos);
 	ASSERT_NE(log_content.find(debug_msg), std::string::npos);
@@ -78,7 +56,7 @@ TEST_F(LoggerTest, JsonParseable) {
 	media_handler::utils::Logger::flush_all();
 	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-	std::string content = read_file((test_log_dir / "media_handler.json").string());
+	std::string content = read_file((test_dir / "media_handler.json").string());
 	ASSERT_FALSE(content.empty());
 
 	// Parse line by line
@@ -143,8 +121,8 @@ TEST_F(LoggerTest, MultipleIndependentLoggers) {
 	media_handler::utils::Logger::flush_all();
 	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-	std::string txt = read_file((test_log_dir / "media_handler.log").string());
-	std::string json = read_file((test_log_dir / "media_handler.json").string());
+	std::string txt = read_file((test_dir / "media_handler.log").string());
+	std::string json = read_file((test_dir / "media_handler.json").string());
 
 	EXPECT_TRUE(txt.find("From Logger1") != std::string::npos);
 	EXPECT_TRUE(json.find("\"message\": \"From Logger2\"") != std::string::npos);
@@ -158,7 +136,7 @@ TEST_F(LoggerTest, FlushOnErrorImmediate) {
 
 	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-	std::string content = read_file((test_log_dir / "media_handler.log").string());
+	std::string content = read_file((test_dir / "media_handler.log").string());
 	EXPECT_TRUE(content.find("This should flush immediately") != std::string::npos);
 }
 
@@ -174,7 +152,7 @@ TEST_F(LoggerTest, RuntimeLevelChange) {
 	media_handler::utils::Logger::flush_all();
 	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-	std::string content = read_file((test_log_dir / "media_handler.log").string());
+	std::string content = read_file((test_dir / "media_handler.log").string());
 	EXPECT_TRUE(content.find("Should not appear") == std::string::npos);
 	EXPECT_TRUE(content.find("Should appear") != std::string::npos);
 	EXPECT_TRUE(content.find("Now debug appears") != std::string::npos);
@@ -197,7 +175,7 @@ TEST_F(LoggerTest, LoggerCopyMove) {
 	media_handler::utils::Logger::flush_all();
 	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-	std::string content = read_file((test_log_dir / "media_handler.log").string());
+	std::string content = read_file((test_dir / "media_handler.log").string());
 	EXPECT_TRUE(content.find("First") != std::string::npos);
 	EXPECT_TRUE(content.find("Second") != std::string::npos);
 	EXPECT_TRUE(content.find("Third") != std::string::npos);
