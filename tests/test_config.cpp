@@ -19,11 +19,11 @@ TEST_F(ConfigTest, MissingFile_ReturnsError) {
 /// @brief Test that invalid JSON returns parse error
 TEST_F(ConfigTest, InvalidJson_ReturnsError) {
     {
-        std::ofstream f(fs::path(VALID_CONFIG_FILE));
+        std::ofstream f(fs::path(CONFIG_FILE));
         f << "{ invalid json";  // malformed
     }
 
-    auto result = media_handler::utils::Config::load(fs::path(VALID_CONFIG_FILE).string());
+    auto result = media_handler::utils::Config::load(fs::path(CONFIG_FILE).string());
     EXPECT_FALSE(result.has_value()) << "Invalid JSON should fail";
     EXPECT_TRUE(result.error().find("JSON") != std::string::npos ||
         result.error().find("parse") != std::string::npos);
@@ -32,7 +32,7 @@ TEST_F(ConfigTest, InvalidJson_ReturnsError) {
 /// @brief Test that valid full config loads all fields correctly
 TEST_F(ConfigTest, ValidConfig_LoadsAllFieldsCorrectly) {
     {
-        std::ofstream f(fs::path(VALID_CONFIG_FILE));
+        std::ofstream f(fs::path(CONFIG_FILE));
         f << R"({
             "video": {
                 "codec": "libx265",
@@ -55,7 +55,7 @@ TEST_F(ConfigTest, ValidConfig_LoadsAllFieldsCorrectly) {
         })";
     }
 
-    auto result = media_handler::utils::Config::load(fs::path(VALID_CONFIG_FILE).string());
+    auto result = media_handler::utils::Config::load(fs::path(CONFIG_FILE).string());
     ASSERT_TRUE(result.has_value()) << "Valid config should load successfully";
 
     const auto& cfg = result.value();
@@ -76,42 +76,43 @@ TEST_F(ConfigTest, ValidConfig_LoadsAllFieldsCorrectly) {
 
 /// @brief Test that partial config uses defaults for missing fields
 TEST_F(ConfigTest, PartialConfig_UsesDefaults) {
-    std::ofstream f(fs::path(VALID_CONFIG_FILE));
+    std::ofstream f(fs::path(CONFIG_FILE));
     f << R"({ "general": { "threads": 8 } })";
     f.close();
 
-    auto result = media_handler::utils::Config::load(fs::path(VALID_CONFIG_FILE).string());
+    auto result = media_handler::utils::Config::load(fs::path(CONFIG_FILE).string());
     ASSERT_TRUE(result.has_value());
     const auto& cfg = result.value();
 
+    // Default values:
     EXPECT_EQ(cfg.threads, 8);
-    EXPECT_EQ(cfg.crf, "23");           // default
-    EXPECT_EQ(cfg.video_preset, "medium"); // default
-    EXPECT_EQ(cfg.video_codec, "libx264"); // default
-    EXPECT_EQ(cfg.container, "mp4");    // default
-    EXPECT_FALSE(cfg.json_log);         // default
+    EXPECT_EQ(cfg.crf, "23");           
+    EXPECT_EQ(cfg.video_preset, "medium"); 
+    EXPECT_EQ(cfg.video_codec, "libx264"); 
+    EXPECT_EQ(cfg.container, "mp4");    
+    EXPECT_FALSE(cfg.json_log);      
 }
 
 /// @brief Test that empty config file returns error
 TEST_F(ConfigTest, EmptyFile_ReturnsError) {
     // simulate empty file (open for writing - truncate to 0 length)
-    std::ofstream f(fs::path(VALID_CONFIG_FILE));  
+    std::ofstream f(fs::path(CONFIG_FILE));  
     f.close();
 
-    auto result = media_handler::utils::Config::load(fs::path(VALID_CONFIG_FILE).string());
+    auto result = media_handler::utils::Config::load(fs::path(CONFIG_FILE).string());
     EXPECT_FALSE(result.has_value());
 }
 
 /// @brief Test that wrong field types are ignored (uses defaults)
 TEST_F(ConfigTest, WrongTypes_AreIgnored) {
     {
-        std::ofstream f(fs::path(VALID_CONFIG_FILE));
+        std::ofstream f(fs::path(CONFIG_FILE));
         f << R"({
             "general": { "threads": "not_a_number", "json_log": "yes" }
         })";
     }
 
-    auto result = media_handler::utils::Config::load(fs::path(VALID_CONFIG_FILE).string());
+    auto result = media_handler::utils::Config::load(fs::path(CONFIG_FILE).string());
     ASSERT_TRUE(result.has_value());
 
     const auto& cfg = result.value();

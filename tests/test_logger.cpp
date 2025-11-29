@@ -62,7 +62,7 @@ TEST_F(LoggerTest, CreateTxtLogger) {
 	//avoid race condition on file write and read
 	std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
 
-	std::string log_content = read_file("logs/media_handler.log");
+	std::string log_content = read_file((test_log_dir / "media_handler.log").string());
 
 	ASSERT_NE(log_content.find(info_msg), std::string::npos);
 	ASSERT_NE(log_content.find(debug_msg), std::string::npos);

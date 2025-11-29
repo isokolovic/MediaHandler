@@ -23,6 +23,7 @@ target_sources(${PROJECT_NAME}
         src/main.cpp
         src/utils/config.cpp
         src/utils/logger.cpp
+        src/utils/app_args.cpp
  )
 
 target_include_directories(${PROJECT_NAME}
@@ -52,6 +53,7 @@ if(BUILD_TESTS)
         tests/test_common.cpp
         tests/test_config.cpp
         tests/test_logger.cpp
+        src/utils/app_args.cpp
         src/utils/config.cpp
         src/utils/logger.cpp
     )
@@ -67,6 +69,7 @@ if(BUILD_TESTS)
             GTest::gtest_main
             spdlog::spdlog
             nlohmann_json::nlohmann_json # For json parsing 
+            CLI11::CLI11
     )
 
     add_test(NAME media_handler_tests COMMAND media_handler_tests)

@@ -4,7 +4,7 @@
 #include <expected>
 #include <spdlog/spdlog.h>
 
-#define VALID_CONFIG_FILE "config.json"
+#define CONFIG_FILE "config.json"
 
 namespace media_handler::utils {
 

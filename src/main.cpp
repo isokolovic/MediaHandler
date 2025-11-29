@@ -1,38 +1,27 @@
-#include <CLI/CLI.hpp>
-#include "utils/config.h"
+#include "utils/app_args.h"
 #include "utils/utils.h"
 #include <iostream>
 
 int main(int argc, char** argv) {
-    CLI::App app{ "Media Handler" };
+	// Create logger for early errors and parse CLI + config.json
+    auto logger = media_handler::utils::Logger::create("MediaHandler");
+    auto args = media_handler::utils::parse_command_line(argc, argv, logger);
 
-    media_handler::utils::Config cfg;
-
-    // Load config.json
-    auto result = media_handler::utils::Config::load(VALID_CONFIG_FILE);
-    if (result) {
-        cfg = *result;
-    }
-    else if (!result.error().empty()) {
-        std::cerr << "Config warning: " << result.error() << " — using defaults\n";
+    if (args.show_help) {
+        return 0;
     }
 
-    // CLI overrides .json values
-    app.add_option("--log-level", cfg.log_level, "Log level")
-        ->check(CLI::IsMember({ "trace", "debug", "info", "warn", "error", "critical" }));
-    app.add_flag("--json", cfg.json_log, "Use JSON logging");
-    app.add_option("--threads", cfg.threads, "Number of threads");
-    app.add_option("--crf", cfg.crf, "CRF quality");
+    // Re-create logger with final settings
+    logger = args.cfg.json_log
+        ? media_handler::utils::Logger::create_json("MediaHandler", args.cfg.log_level)
+        : media_handler::utils::Logger::create("MediaHandler", args.cfg.log_level);
 
-    CLI11_PARSE(app, argc, argv);
+    logger->info("MediaHandler started");
+    logger->info("Input files: {}", args.inputs.size());
+    logger->info("Output dir: {}", args.cfg.output_dir);
+    logger->info("Threads: {}, CRF: {}", args.cfg.threads, args.cfg.crf);
 
-    // Final logger
-    auto logger = cfg.json_log
-        ? media_handler::utils::Logger::create_json("MediaHandler", cfg.log_level)
-        : media_handler::utils::Logger::create("MediaHandler", cfg.log_level);
-
-    logger->info("Started with {} threads, CRF {}", cfg.threads, cfg.crf);
-    logger->info("Done.");
+    logger->info("All done!");
     media_handler::utils::Logger::flush_all();
 
     return 0;
