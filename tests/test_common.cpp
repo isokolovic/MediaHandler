@@ -1,6 +1,8 @@
 #include "test_common.h"
 #include <chrono>
 
+namespace media_handler::tests{
+
 void TestCommon::SetUp() {
     auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()).count();
@@ -29,3 +31,4 @@ void TestCommon::TearDown() {
 std::filesystem::path TestCommon::path(const std::string& filename) const {
     return test_dir / filename;
 }
+} // namespace media_handler::tests

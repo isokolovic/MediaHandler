@@ -4,9 +4,8 @@
 #include <format>
 
 using json = nlohmann::json;
-using namespace media_handler::utils;
 
-namespace media_handler {
+namespace media_handler::utils {
     std::expected<Config, std::string> Config::load(const std::string& path) {
         Config cfg;
 
