@@ -16,6 +16,13 @@ namespace media_handler::utils {
 			spdlog::init_thread_pool(8192, 1); // queue size, thread count
 			});
 
+		// Reuse existing logger if present
+		if (auto existing = spdlog::get(name)) {
+			existing->set_level(level);
+			existing->flush_on(spdlog::level::err);
+			return existing;
+		}
+
 		auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
 		std::string file_name = json_format ? log_dir + "/media_handler.json" : log_dir + "/media_handler.log";
 		auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(file_name, true);

@@ -24,6 +24,7 @@ target_sources(${PROJECT_NAME}
         src/utils/config.cpp
         src/utils/logger.cpp
         src/utils/app_args.cpp
+        src/media_handler/compression_engine.cpp
  )
 
 target_include_directories(${PROJECT_NAME}
@@ -50,9 +51,11 @@ if(BUILD_TESTS)
     find_package(nlohmann_json CONFIG REQUIRED)
 
     add_executable(media_handler_tests
+        tests/test_compression_engine.cpp
         tests/test_common.cpp
         tests/test_config.cpp
         tests/test_logger.cpp
+        src/media_handler/compression_engine.cpp
         src/utils/app_args.cpp
         src/utils/config.cpp
         src/utils/logger.cpp
