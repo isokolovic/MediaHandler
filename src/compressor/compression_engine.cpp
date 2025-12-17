@@ -1,11 +1,11 @@
-#include "media_handler/compression_engine.h"
+#include "compressor/compression_engine.h"
 #include "utils/utils.h"
 #include <algorithm>
 #include <format>
 #include <queue>
 #include <latch>
 
-namespace media_handler::media_handler {
+namespace media_handler::compressor {
 
     CompressionEngine::CompressionEngine(const utils::Config& cfg)
         : config(cfg) // Fill params from config.json

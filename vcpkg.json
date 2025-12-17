@@ -2,10 +2,14 @@
   "name": "media-handler",
   "version-string": "1.0.0",
   "dependencies": [
+    "libjpeg-turbo",
+    "libheif",
     "libexif",
+    "ffmpeg",
+    "libpng",
     "spdlog",
     "cli11",
     "nlohmann-json",
-    "gtest"    
+    "gtest"
   ]
 }

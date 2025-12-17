@@ -5,7 +5,7 @@
 #include <array>
 #include <string>
 
-namespace media_handler::media_handler {
+namespace media_handler::compressor {
 
     class CompressionEngine {
     public:

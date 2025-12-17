@@ -1,5 +1,5 @@
 #include "test_common.h"
-#include "media_handler/compression_engine.h"
+#include "compressor/compression_engine.h"
 #include "utils/config.h"
 #include "utils/utils.h"
 #include <fstream>
@@ -12,7 +12,7 @@ namespace media_handler::tests {
         utils::Config cfg;
         cfg.threads = 4;
 
-        media_handler::CompressionEngine engine(cfg);
+        compressor::CompressionEngine engine(cfg);
 
         // Create test files in per-test temp dir
         std::ofstream(path("video.mp4")) << "fake";
@@ -31,7 +31,7 @@ namespace media_handler::tests {
 		cfg.json_log = true;  // simpler logging for test
 		cfg.log_level = spdlog::level::debug;
 
-        media_handler::CompressionEngine engine(cfg);
+        compressor::CompressionEngine engine(cfg);
 
         std::vector<std::filesystem::path> files;
         for (int i = 0; i < 20; ++i) {
