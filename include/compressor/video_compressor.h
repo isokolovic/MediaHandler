@@ -6,14 +6,14 @@ namespace media_handler::compressor {
 class VideoCompressor {
 public:
 	explicit VideoCompressor(const utils::Config& cfg, std::shared_ptr<spdlog::logger> logger);
-	virtual ~VideoCompressor() = default;
 
-	virtual bool compress(const std::string& input, const std::string& output) = 0;
-
-protected:
+	/// @brief Compress a video file
+	/// @param input Input video path
+	/// @param output Output video path
+	/// @return True on success
+	bool compress(const std::string& input, const std::string& output);
+private:
 	utils::Config config;
 	std::shared_ptr<spdlog::logger> logger;
-
-	bool fallback_copy(const std::string& input, const std::string& output) const;
 };
-}
+} // namespace media_handler::compressor
