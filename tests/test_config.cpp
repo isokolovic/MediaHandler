@@ -11,19 +11,21 @@ namespace media_handler::tests {
 
     /// @brief Test loading invalid config file
     TEST_F(ConfigTest, MissingFile_ReturnsError) {
-        auto result = media_handler::utils::Config::load(INVALID_CONFIG_FILE);
+        auto logger = media_handler::utils::Logger::create("MissingFile_ReturnsError", spdlog::level::info, true);
+        auto result = media_handler::utils::Config::load(INVALID_CONFIG_FILE, logger);
         EXPECT_FALSE(result.has_value());
         EXPECT_FALSE(result.error().empty());
     }
 
     /// @brief Test that invalid JSON returns parse error
     TEST_F(ConfigTest, InvalidJson_ReturnsError) {
+        auto logger = media_handler::utils::Logger::create("InvalidJson_ReturnsError", spdlog::level::info, true);
         {
             std::ofstream f(std::filesystem::path(CONFIG_FILE));
             f << "{ invalid json";  // malformed
         }
 
-        auto result = media_handler::utils::Config::load(std::filesystem::path(CONFIG_FILE).string());
+        auto result = media_handler::utils::Config::load(std::filesystem::path(CONFIG_FILE).string(), logger);
         EXPECT_FALSE(result.has_value()) << "Invalid JSON should fail";
         EXPECT_TRUE(result.error().find("JSON") != std::string::npos ||
             result.error().find("parse") != std::string::npos);
@@ -31,6 +33,7 @@ namespace media_handler::tests {
 
     /// @brief Test that valid full config loads all fields correctly
     TEST_F(ConfigTest, ValidConfig_LoadsAllFieldsCorrectly) {
+        auto logger = media_handler::utils::Logger::create("ValidConfig_LoadsAllFieldsCorrectly", spdlog::level::info, true);
         {
             std::ofstream f(std::filesystem::path(CONFIG_FILE));
             f << R"({
@@ -55,7 +58,7 @@ namespace media_handler::tests {
         })";
         }
 
-        auto result = media_handler::utils::Config::load(std::filesystem::path(CONFIG_FILE).string());
+        auto result = media_handler::utils::Config::load(std::filesystem::path(CONFIG_FILE).string(), logger);
         ASSERT_TRUE(result.has_value()) << "Valid config should load successfully";
 
         const auto& cfg = result.value();
@@ -76,11 +79,12 @@ namespace media_handler::tests {
 
     /// @brief Test that partial config uses defaults for missing fields
     TEST_F(ConfigTest, PartialConfig_UsesDefaults) {
+        auto logger = media_handler::utils::Logger::create("PartialConfig_UsesDefaults", spdlog::level::info, true);
         std::ofstream f(std::filesystem::path(CONFIG_FILE));
         f << R"({ "general": { "threads": 8 } })";
         f.close();
 
-        auto result = media_handler::utils::Config::load(std::filesystem::path(CONFIG_FILE).string());
+        auto result = media_handler::utils::Config::load(std::filesystem::path(CONFIG_FILE).string(), logger);
         ASSERT_TRUE(result.has_value());
         const auto& cfg = result.value();
 
@@ -95,29 +99,27 @@ namespace media_handler::tests {
 
     /// @brief Test that empty config file returns error
     TEST_F(ConfigTest, EmptyFile_ReturnsError) {
+        auto logger = media_handler::utils::Logger::create("EmptyFile_ReturnsError", spdlog::level::info, true);
         // simulate empty file (open for writing - truncate to 0 length)
         std::ofstream f(std::filesystem::path(CONFIG_FILE));
         f.close();
 
-        auto result = media_handler::utils::Config::load(std::filesystem::path(CONFIG_FILE).string());
+        auto result = media_handler::utils::Config::load(std::filesystem::path(CONFIG_FILE).string(), logger);
         EXPECT_FALSE(result.has_value());
     }
 
     /// @brief Test that wrong field types are ignored (uses defaults)
-    TEST_F(ConfigTest, WrongTypes_AreIgnored) {
+    TEST_F(ConfigTest, WrongTypes_CauseFailure) {
+        auto logger = media_handler::utils::Logger::create("WrongTypes_Strict", spdlog::level::info, true);
+
         {
-            std::ofstream f(std::filesystem::path(CONFIG_FILE));
-            f << R"({
-            "general": { "threads": "not_a_number", "json_log": "yes" }
-        })";
+            std::ofstream f(CONFIG_FILE);
+            f << R"({ "general": { "threads": "not_a_number" } })";
         }
 
-        auto result = media_handler::utils::Config::load(std::filesystem::path(CONFIG_FILE).string());
-        ASSERT_TRUE(result.has_value());
-
-        const auto& cfg = result.value();
-        // Default - string ignored:
-        EXPECT_EQ(cfg.threads, 4);
-        EXPECT_FALSE(cfg.json_log);
+        auto result = media_handler::utils::Config::load(CONFIG_FILE, logger);
+        ASSERT_FALSE(result.has_value()) << "Load should fail when 'threads' is a string instead of a number";
+        EXPECT_TRUE(result.error().find("type_error.302") != std::string::npos);
+        EXPECT_TRUE(result.error().find("type must be number") != std::string::npos);
     }
 } // namespace media_handler::tests

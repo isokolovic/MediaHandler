@@ -1,29 +1,32 @@
-#include <utils/config.h>
-#include <nlohmann/json.hpp>
+#include "utils/config.h"
+#include <filesystem>
+#include <expected>
 #include <fstream>
 #include <format>
-
-using json = nlohmann::json;
+#include <string>
+#include <memory>
+#include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
 
 namespace media_handler::utils {
-    std::expected<Config, std::string> Config::load(const std::string& path) {
+
+    std::expected<Config, std::string> Config::load(const std::filesystem::path& path, const std::shared_ptr<spdlog::logger>& logger) {
         Config cfg;
 
         std::ifstream file(path);
         if (!file.is_open()) {
-            return std::unexpected("Config file not found: " + path);
+            return std::unexpected(std::format("Config file not found: {}", path.string()));
         }
 
-        json j;
+        nlohmann::json j;
         try {
             file >> j;
         }
-        catch (const json::parse_error& e) {
+        catch (const nlohmann::json::parse_error& e) {
             return std::unexpected(std::format("JSON parse error: {}", e.what()));
         }
 
         try {
-            // Video
             if (j.contains("video") && j["video"].is_object()) {
                 const auto& v = j["video"];
                 cfg.video_codec = v.value("codec", cfg.video_codec);
@@ -33,56 +36,41 @@ namespace media_handler::utils {
                 cfg.bufsize = v.value("bufsize", cfg.bufsize);
             }
 
-            // Audio
             if (j.contains("audio") && j["audio"].is_object()) {
                 const auto& a = j["audio"];
                 cfg.audio_codec = a.value("codec", cfg.audio_codec);
                 cfg.audio_bitrate = a.value("bitrate", cfg.audio_bitrate);
             }
 
-            // General
             if (j.contains("general") && j["general"].is_object()) {
                 const auto& g = j["general"];
                 cfg.container = g.value("container", cfg.container);
+                cfg.input_dir = g.value("input_dir", cfg.input_dir);
                 cfg.output_dir = g.value("output_dir", cfg.output_dir);
                 cfg.threads = g.value("threads", cfg.threads);
                 cfg.json_log = g.value("json_log", cfg.json_log);
 
                 if (g.contains("log_level")) {
-                    std::string lvl = g.value("log_level", "info");
-                    cfg.log_level = spdlog::level::from_str(lvl);
+                    cfg.log_level = spdlog::level::from_str(g.value("log_level", "info"));
                 }
             }
         }
-        catch (...) {
-            // Any conversion error: silently keep defaults
+        catch (const nlohmann::json::type_error& e) {
+            return std::unexpected(std::format("Config type mismatch: {}", e.what()));
+        }
+
+        auto val = cfg.validate();
+        if (!val) {
+            return std::unexpected(val.error());
         }
 
         return cfg;
     }
 
-	void Config::save(const std::string& path) const {
-		json j;
-
-		// Video
-		j["video"]["codec"] = video_codec;
-		j["video"]["preset"] = video_preset;
-		j["video"]["crf"] = crf;
-		if (!maxrate.empty()) j["video"]["maxrate"] = maxrate;
-		if (!bufsize.empty()) j["video"]["bufsize"] = bufsize;
-
-		// Audio
-		j["audio"]["codec"] = audio_codec;
-		j["audio"]["bitrate"] = audio_bitrate;
-
-		// General
-		j["general"]["container"] = container;
-		j["general"]["output_dir"] = output_dir;
-		j["general"]["threads"] = threads;
-		j["general"]["json_log"] = json_log;
-		j["general"]["log_level"] = spdlog::level::to_string_view(log_level);
-
-		std::ofstream f(path);
-		f << std::setw(4) << j << std::endl;
-	}
+    std::expected<void, std::string> Config::validate() const {
+        if (threads == 0) return std::unexpected("config.json: threads must be >= 1");
+        if (input_dir.empty()) return std::unexpected("config.json: input_dir must not be empty");
+        if (output_dir.empty()) return std::unexpected("config.json: output_dir must not be empty");
+        return {};
+    }
 }

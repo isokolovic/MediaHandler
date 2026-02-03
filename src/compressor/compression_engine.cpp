@@ -1,4 +1,5 @@
 #include "compressor/compression_engine.h"
+#include "compressor/image_processor.h"
 #include "utils/utils.h"
 #include <algorithm>
 #include <format>
@@ -61,9 +62,13 @@ namespace media_handler::compressor {
         std::condition_variable cv; // lets worker sleep until there's work available
 		bool done = false; // signals no more work will be added
         std::latch finished(num_threads); // latch ensures we wait until all workers finish
+        // TODO why not std::latch finished(static_cast<std::ptrdiff_t>(num_threads));
+
+        // Create a single ImageProcessor instance (thread-safe process method) 
+        media_handler::compressor::ImageProcessor image_processor(config, logger); 
 
         // Worker lambda: each thread repeatedly pops files and processes them
-        auto worker = [this, &work, &m, &cv, &done, &finished]() {
+        auto worker = [this, &work, &m, &cv, &done, &finished, &image_processor]() {
             while (true) {
                 std::filesystem::path file;
                 {
@@ -75,8 +80,26 @@ namespace media_handler::compressor {
                 }
                 logger->info("[THREAD] Processing: {}", file.filename().string());
 
+                try { 
+                    std::filesystem::path output = config.output_dir / file.filename(); 
+					auto res = image_processor.compress(file, output);
+                        
+                    if (res.success) { 
+                        logger->info("[THREAD] Done: {}", file.filename().string()); 
+                    } 
+                    else { 
+                        logger->warn("[THREAD] Failed: {} reason: {}", file.filename().string(), res.message); 
+                    } 
+                } 
+                catch (const std::exception& e) { 
+                    logger->error("[THREAD] Exception processing {}: {}", file.string(), e.what()); 
+                }
+                catch (...) { 
+                    logger->error("[THREAD] Unknown exception processing {}", file.string()); 
+                }
+
 				// TODO : actual migration logic here
-                std::this_thread::sleep_for(std::chrono::milliseconds(50)); 
+                //std::this_thread::sleep_for(std::chrono::milliseconds(50)); 
 
                 logger->info("[THREAD] Done: {}", file.filename().string());
             }

@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.31)
+
 project(MediaHandler LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
@@ -11,7 +12,6 @@ if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
         CACHE STRING "")
 endif()
 
-# Find packages
 find_package(unofficial-libexif CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(CLI11 CONFIG REQUIRED)
@@ -20,7 +20,6 @@ find_package(PNG REQUIRED)
 find_package(libheif CONFIG REQUIRED)
 find_package(FFMPEG REQUIRED COMPONENTS avcodec avformat avutil swscale)
 
-# Executable
 add_executable(${PROJECT_NAME})
 target_sources(${PROJECT_NAME}
     PRIVATE
@@ -29,9 +28,9 @@ target_sources(${PROJECT_NAME}
         src/utils/logger.cpp
         src/utils/app_args.cpp
         src/compressor/compression_engine.cpp
-        src/compressor/video_compressor.cpp
-        src/compressor/image_compressor.cpp
- )
+        src/compressor/video_processor.cpp
+        src/compressor/image_processor.cpp
+)
 
 target_include_directories(${PROJECT_NAME}
     PRIVATE
@@ -54,6 +53,13 @@ target_link_libraries(${PROJECT_NAME}
 # IDE folder grouping
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
+# Copy config.json to output dir
+add_custom_command(
+    TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${PROJECT_SOURCE_DIR}/config.json"
+            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/config.json")
+
 # Tests
 option(BUILD_TESTS "Build unit tests" ON)
 if(BUILD_TESTS)
@@ -67,8 +73,8 @@ if(BUILD_TESTS)
         tests/test_config.cpp
         tests/test_logger.cpp
         src/compressor/compression_engine.cpp
-        src/compressor/video_compressor.cpp
-        src/compressor/image_compressor.cpp
+        src/compressor/video_processor.cpp
+        src/compressor/image_processor.cpp
         src/utils/app_args.cpp
         src/utils/config.cpp
         src/utils/logger.cpp
@@ -85,7 +91,7 @@ if(BUILD_TESTS)
         PRIVATE
             GTest::gtest_main
             spdlog::spdlog
-            nlohmann_json::nlohmann_json # For json parsing 
+            nlohmann_json::nlohmann_json
             CLI11::CLI11
             JPEG::JPEG
             PNG::PNG
@@ -93,6 +99,12 @@ if(BUILD_TESTS)
             unofficial::libexif::libexif
             ${FFMPEG_LIBRARIES}
     )
+
+    add_custom_command(
+        TARGET media_handler_tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${PROJECT_SOURCE_DIR}/config.json"
+                "$<TARGET_FILE_DIR:media_handler_tests>/config.json")
 
     add_test(NAME media_handler_tests COMMAND media_handler_tests)
 endif()

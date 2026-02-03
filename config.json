@@ -12,7 +12,8 @@
   },
   "general": {
     "container": "mp4",
-    "output_dir": "output",
+    "input_dir": "C:\\Users\\isoko\\Desktop\\New folder\\S",
+    "output_dir": "C:\\Users\\isoko\\Desktop\\New folder\\D",
     "threads": 12,
     "json_log": true,
     "log_level": "debug"
