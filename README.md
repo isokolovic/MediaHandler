@@ -40,7 +40,6 @@ Simple tool to compress and organize multimedia files.
      ```  
    - Run the script with source and destination folders:  
      ```bash
-     python media_handler.py C:\source C:\dest  # Windows  
-     python media_handler.py /source /dest      # Linux  
+     python media_handler.py C:\source C:\dest
      ```  
    - The script compresses files and moves them to `destination_folder`, preserving the folder structure.
