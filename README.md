@@ -4,11 +4,7 @@
 
 ---
 
-Simple tool to compress and organize multimedia files. Available in two versions:  
-- **Python**: Simple and customizable. 
-- **C**: High-performance for large-scale processing.
-
-**Example Usage (both versions):** 
+**Example Usage:** 
 
 - Specify the source and destination directories as command-line arguments.  
 - The tool compresses multimedia files (from source folder) and recreates the folder structure at the destination.
@@ -21,37 +17,6 @@ Simple tool to compress and organize multimedia files. Available in two versions
 ---
 
 ## Setup Instructions
-
-### Python Version
-
-1. **Install Python**:  
-   - Download and install Python from [python.org](https://www.python.org/downloads/).  
-
-2. **Install Dependencies**:  
-   - Open a terminal and run:  
-     ```bash
-     pip install Pillow pillow-heif av 
-     ```  
-   - Install `ffmpeg`:  
-     - **Windows**: Download from [ffmpeg.org](https://ffmpeg.org/download.html), extract, and add to `PATH` (e.g., `C:\ffmpeg\bin`).  
-     - **Linux**: Run `sudo apt update && sudo apt install ffmpeg`.
-
-3. **Run the Script**:  
-   - Save the script  
-   - In a terminal, navigate to the script’s folder:  
-     ```bash
-     cd path/to/script/folder
-     ```  
-   - Run the script with source and destination folders:  
-     ```bash
-     python media_handler.py C:\source C:\dest  # Windows  
-     python media_handler.py /source /dest      # Linux  
-     ```  
-   - The script compresses files and moves them to `destination_folder`, preserving the folder structure.
-
----
-
-### C Version
 
 1. **Install Build Tools**:  
    - **Windows** : Install [CMake](https://cmake.org/download/). Add to `PATH`.  
