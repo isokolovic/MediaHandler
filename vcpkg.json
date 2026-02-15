@@ -1,6 +1,7 @@
 {
   "name": "mediahandler",
   "version": "1.0.0",
+  "builtin-baseline": "e5a1490e1409d175932ef6014519e9ae149ddb7c",
   "dependencies": [
     "libheif",
     "libexif",
@@ -11,5 +12,11 @@
     "ffmpeg",
     "gtest",
     "nlohmann-json"
+  ],
+  "overrides": [
+    {
+      "name": "libheif",
+      "version": "1.20.1"
+    }
   ]
 }
