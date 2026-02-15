@@ -1,0 +1,15 @@
+{
+  "name": "mediahandler",
+  "version": "1.0.0",
+  "dependencies": [
+    "libheif",
+    "libexif",
+    "spdlog",
+    "cli11",
+    "libjpeg-turbo",
+    "libpng",
+    "ffmpeg",
+    "gtest",
+    "nlohmann-json"
+  ]
+}

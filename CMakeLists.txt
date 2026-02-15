@@ -45,24 +45,59 @@ target_include_directories(media_migration_tests PRIVATE
     ${CMAKE_SOURCE_DIR}/tests/include
 )
 
-# Linux-specific setup
-if(UNIX)
-    # Required packages
+# Platform-specific setup
+if(WIN32)
+    # Windows with vcpkg
+    find_package(JPEG REQUIRED)
+    find_package(PNG REQUIRED)
+    find_package(unofficial-libexif CONFIG REQUIRED)
+    find_package(libheif CONFIG REQUIRED)
+    find_package(GTest CONFIG REQUIRED)
+    
+    # FFmpeg
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
+        libavformat
+        libavcodec
+        libavutil
+        libswscale
+    )
+    
+    # Link libraries to media_core (PRIVATE for libs, but make FFmpeg include PUBLIC)
+    target_link_libraries(media_core PRIVATE
+        JPEG::JPEG
+        PNG::PNG
+        unofficial::libexif::libexif
+        heif
+        PkgConfig::FFMPEG
+    )
+    
+    # Make FFmpeg includes available to all targets that link media_core
+    target_include_directories(media_core PUBLIC ${FFMPEG_INCLUDE_DIRS})
+    
+    # Link Google Test
+    target_link_libraries(media_migration_tests PRIVATE 
+        GTest::gtest 
+        GTest::gtest_main
+    )
+    
+elseif(UNIX)
+    # Linux-specific setup
     find_package(PkgConfig REQUIRED)
     find_package(GTest CONFIG REQUIRED)
-
+    
     # Detect media libraries via pkg-config
     foreach(lib IN ITEMS libjpeg libpng libexif libheif libavformat libavcodec libavutil libswscale)
         string(TOUPPER ${lib} LIB_UPPER)
         pkg_check_modules(${LIB_UPPER} REQUIRED ${lib})
-
         message(STATUS "${lib} found: ${${LIB_UPPER}_FOUND}")
         message(STATUS "${lib} libs: ${${LIB_UPPER}_LIBRARIES}")
         
         target_compile_options(media_core PRIVATE ${${LIB_UPPER}_CFLAGS_OTHER})
         target_link_libraries(media_core PRIVATE ${${LIB_UPPER}_LIBRARIES})
+        target_include_directories(media_core PUBLIC ${${LIB_UPPER}_INCLUDE_DIRS})
     endforeach()
-
+    
     # Link Google Test
     target_link_libraries(media_migration_tests PRIVATE GTest::gtest GTest::gtest_main)
 endif()
