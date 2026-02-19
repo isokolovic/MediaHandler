@@ -1,4 +1,4 @@
-#include "utils/utils.h"
+﻿#include "utils/utils.h"
 #include "compressor/image_processor.h"
 #include <fstream>
 #include <algorithm>
@@ -10,16 +10,18 @@
 
 namespace media_handler::compressor {
 
+    namespace fs = std::filesystem;
+
     ImageProcessor::ImageProcessor(const utils::Config& cfg, std::shared_ptr<spdlog::logger> logger)
 		: config(cfg), logger(std::move(logger)) { //TODO std::move() to avoid ref-count increment
     }
 
-    static bool file_exists_and_readable(const std::filesystem::path& path) {
+    static bool file_exists_and_readable(const fs::path& path) {
         std::error_code ec;
-        return std::filesystem::exists(path, ec) && std::filesystem::is_regular_file(path, ec);
+        return fs::exists(path, ec) && fs::is_regular_file(path, ec);
     }
 
-    ProcessResult ImageProcessor::fallback_copy(const std::filesystem::path& input, const std::filesystem::path& output) {
+    ProcessResult ImageProcessor::fallback_copy(const fs::path& input, const fs::path& output) {
         try {
             std::ifstream src(input, std::ios::binary);
             if (!src) return ProcessResult::Error("Failed to open input for copy");
@@ -30,12 +32,12 @@ namespace media_handler::compressor {
             dst << src.rdbuf();
             return ProcessResult::OK();
         }
-        catch (const std::filesystem::filesystem_error& e) {
+        catch (const fs::filesystem_error& e) {
             return ProcessResult::Error(std::format("Filesystem error during copy: {}", e.what()));
         }
     }
 
-    ProcessResult ImageProcessor::compress_jpeg(const std::filesystem::path& input, const std::filesystem::path& output) {
+    ProcessResult ImageProcessor::compress_jpeg(const fs::path& input, const fs::path& output) {
         FILE* infile = fopen(input.string().c_str(), "rb");
         if (!infile) {
             return ProcessResult::Error("Failed to open input JPEG");
@@ -106,7 +108,7 @@ namespace media_handler::compressor {
         return ProcessResult::OK();
     }
 
-    ProcessResult ImageProcessor::compress_heic(const std::filesystem::path& input, const std::filesystem::path& output) {
+    ProcessResult ImageProcessor::compress_heic(const fs::path& input, const fs::path& output) {
         // Signature check
         FILE* f = fopen(input.string().c_str(), "rb");
         if (!f) return ProcessResult::Error("Failed to open HEIC for signature check");
@@ -204,7 +206,7 @@ namespace media_handler::compressor {
         return ProcessResult::OK();
     }
 
-    ProcessResult ImageProcessor::compress_png(const std::filesystem::path& input, const std::filesystem::path& output) {
+    ProcessResult ImageProcessor::compress_png(const fs::path& input, const fs::path& output) {
         png_structp png_read_ptr = NULL;
         png_infop read_info_ptr = NULL;
         png_structp png_write_ptr = NULL;
@@ -356,7 +358,7 @@ namespace media_handler::compressor {
         return ProcessResult::OK();
     }
 
-    ProcessResult ImageProcessor::compress(const std::filesystem::path& input, const std::filesystem::path& output) {
+    ProcessResult ImageProcessor::compress(const fs::path& input, const fs::path& output) {
         try {
             if (!file_exists_and_readable(input)) return ProcessResult::Error("Input file missing");
             auto ext = input.extension().string();

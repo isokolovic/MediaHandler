@@ -1,4 +1,4 @@
-#include "test_common.h"
+﻿#include "test_common.h"
 #include "utils/config.h"
 #include "utils/utils.h"
 #include <fstream>
@@ -6,6 +6,7 @@
 #define INVALID_CONFIG_FILE "invalid_config.json"
 
 namespace media_handler::tests {
+    namespace fs = std::filesystem;
 
     class ConfigTest : public TestCommon {};
 
@@ -21,11 +22,11 @@ namespace media_handler::tests {
     TEST_F(ConfigTest, InvalidJson_ReturnsError) {
         auto logger = media_handler::utils::Logger::create("InvalidJson_ReturnsError", spdlog::level::info, true);
         {
-            std::ofstream f(std::filesystem::path(CONFIG_FILE));
+            std::ofstream f(fs::path(CONFIG_FILE));
             f << "{ invalid json";  // malformed
         }
 
-        auto result = media_handler::utils::Config::load(std::filesystem::path(CONFIG_FILE).string(), logger);
+        auto result = media_handler::utils::Config::load(fs::path(CONFIG_FILE).string(), logger);
         EXPECT_FALSE(result.has_value()) << "Invalid JSON should fail";
         EXPECT_TRUE(result.error().find("JSON") != std::string::npos ||
             result.error().find("parse") != std::string::npos);
@@ -35,7 +36,7 @@ namespace media_handler::tests {
     TEST_F(ConfigTest, ValidConfig_LoadsAllFieldsCorrectly) {
         auto logger = media_handler::utils::Logger::create("ValidConfig_LoadsAllFieldsCorrectly", spdlog::level::info, true);
         {
-            std::ofstream f(std::filesystem::path(CONFIG_FILE));
+            std::ofstream f(fs::path(CONFIG_FILE));
             f << R"({
             "video": {
                 "codec": "libx265",
@@ -58,7 +59,7 @@ namespace media_handler::tests {
         })";
         }
 
-        auto result = media_handler::utils::Config::load(std::filesystem::path(CONFIG_FILE).string(), logger);
+        auto result = media_handler::utils::Config::load(fs::path(CONFIG_FILE).string(), logger);
         ASSERT_TRUE(result.has_value()) << "Valid config should load successfully";
 
         const auto& cfg = result.value();
@@ -80,11 +81,11 @@ namespace media_handler::tests {
     /// @brief Test that partial config uses defaults for missing fields
     TEST_F(ConfigTest, PartialConfig_UsesDefaults) {
         auto logger = media_handler::utils::Logger::create("PartialConfig_UsesDefaults", spdlog::level::info, true);
-        std::ofstream f(std::filesystem::path(CONFIG_FILE));
+        std::ofstream f(fs::path(CONFIG_FILE));
         f << R"({ "general": { "threads": 8 } })";
         f.close();
 
-        auto result = media_handler::utils::Config::load(std::filesystem::path(CONFIG_FILE).string(), logger);
+        auto result = media_handler::utils::Config::load(fs::path(CONFIG_FILE).string(), logger);
         ASSERT_TRUE(result.has_value());
         const auto& cfg = result.value();
 
@@ -101,10 +102,10 @@ namespace media_handler::tests {
     TEST_F(ConfigTest, EmptyFile_ReturnsError) {
         auto logger = media_handler::utils::Logger::create("EmptyFile_ReturnsError", spdlog::level::info, true);
         // simulate empty file (open for writing - truncate to 0 length)
-        std::ofstream f(std::filesystem::path(CONFIG_FILE));
+        std::ofstream f(fs::path(CONFIG_FILE));
         f.close();
 
-        auto result = media_handler::utils::Config::load(std::filesystem::path(CONFIG_FILE).string(), logger);
+        auto result = media_handler::utils::Config::load(fs::path(CONFIG_FILE).string(), logger);
         EXPECT_FALSE(result.has_value());
     }
 

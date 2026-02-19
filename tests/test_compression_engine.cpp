@@ -1,10 +1,11 @@
-#include "test_common.h"
+﻿#include "test_common.h"
 #include "compressor/compression_engine.h"
 #include "utils/config.h"
 #include "utils/utils.h"
 #include <fstream>
 
 namespace media_handler::tests {
+    namespace fs = std::filesystem;
     class CompressionEngineTest : public TestCommon {};
 
 	/// @brief Test that scan_media_files finds supported files
@@ -33,9 +34,9 @@ namespace media_handler::tests {
 
         compressor::CompressionEngine engine(cfg);
 
-        std::vector<std::filesystem::path> files;
+        std::vector<fs::path> files;
         for (int i = 0; i < 20; ++i) {
-            std::filesystem::path p = path("file" + std::to_string(i) + ".mp4");
+            fs::path p = path("file" + std::to_string(i) + ".mp4");
             std::ofstream(p) << "fake";
             files.push_back(p);
         }

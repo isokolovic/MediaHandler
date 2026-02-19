@@ -68,6 +68,7 @@ if(BUILD_TESTS)
     find_package(nlohmann_json CONFIG REQUIRED)
 
     add_executable(media_handler_tests
+        tests/test_image_compressor.cpp
         tests/test_compression_engine.cpp
         tests/test_common.cpp
         tests/test_config.cpp

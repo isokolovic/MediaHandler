@@ -1,4 +1,4 @@
-#include "utils/config.h"
+﻿#include "utils/config.h"
 #include <filesystem>
 #include <expected>
 #include <fstream>
@@ -10,7 +10,9 @@
 
 namespace media_handler::utils {
 
-    std::expected<Config, std::string> Config::load(const std::filesystem::path& path, const std::shared_ptr<spdlog::logger>& logger) {
+    namespace fs = std::filesystem;
+
+    std::expected<Config, std::string> Config::load(const fs::path& path, const std::shared_ptr<spdlog::logger>& logger) {
         Config cfg;
 
         std::ifstream file(path);
