@@ -6,7 +6,7 @@ namespace media_handler::utils {
     AppArgs parse_command_line(int argc, char** argv, std::shared_ptr<spdlog::logger>& logger) {
         AppArgs args;
 
-        // Load config.json first; result overrides defaults
+        // 1. Load config.json first; result overrides defaults
         if (auto result = Config::load(CONFIG_FILE, logger)) {
             args.cfg = std::move(*result);
         }
@@ -14,6 +14,7 @@ namespace media_handler::utils {
             logger->warn("Config load error: {} — using defaults", result.error());
         }
 
+        // 2. Parse CLI and override JSON values if provided
         CLI::App app{ "Media Handler — High-performance media converter" };
 
 		// Direct binding to args and args.cfg. Overwritten only if input flag is present
@@ -32,10 +33,18 @@ namespace media_handler::utils {
 
         try {
             app.parse(argc, argv);
+            args.show_help = app.count("--help") > 0;
 
             // Update log level only if provided
             if (!log_level_str.empty()) {
                 args.cfg.log_level = spdlog::level::from_str(log_level_str);
+            }
+
+            // Validate final cfg after overrides
+            auto val = args.cfg.validate();
+            if (!val) {
+                logger->warn("Invalid final config: {} — using defaults", val.error());
+                args.cfg = Config(); // Reset to full defaults if invalid
             }
         }
         catch (const CLI::ParseError& e) {

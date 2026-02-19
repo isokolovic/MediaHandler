@@ -22,10 +22,18 @@ int main(int argc, char** argv) {
     logger->info("Output dir: {}", args.cfg.output_dir);
     logger->info("Threads: {}, CRF: {}", args.cfg.threads, args.cfg.crf);
 
-	auto files = media_handler::compressor::CompressionEngine(args.cfg).scan_media_files(args.cfg.input_dir); //TODO args.inputs[0] is empty! have one from 1. input args 2. config.json 3. defaults. Throw warning if location cannot be found (e.g. default)
+    // Use CLI inputs if provided, else cfg.input_dir, else default
+    std::string effective_input = args.inputs.empty() ? args.cfg.input_dir : args.inputs[0]; 
 
-	media_handler::compressor::CompressionEngine engine(args.cfg);
-	engine.migrate(files);
+    if (effective_input.empty() || !std::filesystem::exists(effective_input)) {
+        logger->warn("Invalid input location: {} — using default 'input'", effective_input);
+        effective_input = "input";
+    }
+
+    auto files = media_handler::compressor::CompressionEngine(args.cfg).scan_media_files(effective_input);
+
+    media_handler::compressor::CompressionEngine engine(args.cfg);
+    engine.migrate(files);
 
 
     logger->info("All done!");

@@ -107,7 +107,7 @@ namespace media_handler::compressor {
     }
 
     ProcessResult ImageProcessor::compress_heic(const std::filesystem::path& input, const std::filesystem::path& output) {
-        //Signature check
+        // Signature check
         FILE* f = fopen(input.string().c_str(), "rb");
         if (!f) return ProcessResult::Error("Failed to open HEIC for signature check");
         unsigned char header[12] = { 0 };
@@ -141,34 +141,65 @@ namespace media_handler::compressor {
             return ProcessResult::Error("Failed to decode HEIC image");
         }
 
-        heif_encoder* encoder = nullptr;
-        err = heif_context_get_encoder_for_format(ctx, heif_compression_AV1, &encoder);
-        if (err.code != heif_error_Ok || !encoder) {
+        // Get image dimensions and data
+        int width = heif_image_get_width(image, heif_channel_interleaved);
+        int height = heif_image_get_height(image, heif_channel_interleaved);
+        int stride;
+        const uint8_t* data = heif_image_get_plane_readonly(image, heif_channel_interleaved, &stride);
+
+        if (!data) {
             heif_image_release(image);
             heif_image_handle_release(handle);
             heif_context_free(ctx);
-            return ProcessResult::Error("Failed to get AV1 encoder");
+            return ProcessResult::Error("Failed to get image data");
         }
 
-        heif_encoder_set_lossy_quality(encoder, PHOTO_QUALITY);
-        err = heif_context_encode_image(ctx, image, encoder, nullptr, nullptr);
-        if (err.code != heif_error_Ok) {
-            heif_encoder_release(encoder);
+        // Change output extension to .jpg
+        auto output_jpeg = output;
+        output_jpeg.replace_extension(".jpg");
+
+        // Open output JPEG file
+        FILE* outfile = fopen(output_jpeg.string().c_str(), "wb");
+        if (!outfile) {
             heif_image_release(image);
             heif_image_handle_release(handle);
             heif_context_free(ctx);
-            return ProcessResult::Error("Failed to encode HEIC image");
+            return ProcessResult::Error("Failed to open output JPEG");
         }
 
-        err = heif_context_write_to_file(ctx, output.string().c_str());
-        heif_encoder_release(encoder);
+        // Initialize JPEG compression
+        struct jpeg_compress_struct cinfo;
+        struct jpeg_error_mgr jerr;
+
+        cinfo.err = jpeg_std_error(&jerr);
+        jpeg_create_compress(&cinfo);
+        jpeg_stdio_dest(&cinfo, outfile);
+
+        cinfo.image_width = width;
+        cinfo.image_height = height;
+        cinfo.input_components = 3;  // RGB
+        cinfo.in_color_space = JCS_RGB;
+
+        jpeg_set_defaults(&cinfo);
+        jpeg_set_quality(&cinfo, PHOTO_QUALITY, TRUE);
+        jpeg_start_compress(&cinfo, TRUE);
+
+        // Write scanlines
+        JSAMPROW row_pointer[1];
+        while (cinfo.next_scanline < cinfo.image_height) {
+            row_pointer[0] = (JSAMPROW)(data + cinfo.next_scanline * stride);
+            jpeg_write_scanlines(&cinfo, row_pointer, 1);
+        }
+
+        // Cleanup JPEG
+        jpeg_finish_compress(&cinfo);
+        jpeg_destroy_compress(&cinfo);
+        fclose(outfile);
+
+        // Cleanup HEIF
         heif_image_release(image);
         heif_image_handle_release(handle);
         heif_context_free(ctx);
-
-        if (err.code != heif_error_Ok) {
-            return ProcessResult::Error(std::string("Failed to write HEIC: ") + (err.message ? err.message : "unknown"));
-        }
 
         return ProcessResult::OK();
     }
