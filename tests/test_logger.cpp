@@ -12,10 +12,24 @@
 
 namespace media_handler::tests {
 
+	namespace fs = std::filesystem;
+
 	class LoggerTest : public TestCommon {
 	protected:
 		void SetUp() override {
 			TestCommon::SetUp();
+		}
+
+		void TearDown() override { 
+			try {
+				const fs::path cfg = "config.json";
+				std::cout << fs::absolute(cfg) << std::endl;
+				if (fs::exists(cfg)) fs::remove(cfg);
+			}
+			catch (const fs::filesystem_error& e) {
+				std::cerr << "Failed to remove config.json: " << e.what() << std::endl;
+			}
+			TestCommon::TearDown();
 		}
 
 		/// @brief Return content as string

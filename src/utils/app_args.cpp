@@ -1,4 +1,5 @@
 #include "utils/app_args.h"
+#include "utils/utils.h"
 #include <CLI/CLI.hpp>
 
 namespace media_handler::utils {
@@ -6,12 +7,20 @@ namespace media_handler::utils {
     AppArgs parse_command_line(int argc, char** argv, std::shared_ptr<spdlog::logger>& logger) {
         AppArgs args;
 
-        // 1. Load config.json first; result overrides defaults
-        if (auto result = Config::load(CONFIG_FILE, logger)) {
-            args.cfg = std::move(*result);
+        // 1. Find and load config.json using PathUtils
+        auto config_file = PathUtils::find_config_file();
+
+        if (config_file.empty()) {
+            logger->warn("No config.json found — using defaults");
         }
         else {
-            logger->warn("Config load error: {} — using defaults", result.error());
+            logger->info("Found config at: {}", config_file.string());
+            if (auto result = Config::load(config_file, logger)) {
+                args.cfg = std::move(*result);
+            }
+            else {
+                logger->warn("Config load error: {} — using defaults", result.error());
+            }
         }
 
         // 2. Parse CLI and override JSON values if provided

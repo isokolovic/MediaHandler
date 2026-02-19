@@ -2,9 +2,23 @@
 #include <spdlog/spdlog.h>
 #include <memory>
 #include <string>
+#include "config.h"
 
 namespace media_handler::utils {
 	inline std::string log_dir = "logs";
+
+	/// @brief Utility functions for path handling and config file discovery
+    class PathUtils {
+    public:
+        /// @brief Get the directory where the executable is located
+        /// @return Absolute path to executable directory
+        static std::filesystem::path get_executable_dir();
+
+        /// @brief Find config.json in standard locations
+        /// @param filename Config filename (default: "config.json")
+        /// @return Path to config file if found, empty path otherwise
+        static std::filesystem::path find_config_file(const std::string& filename = CONFIG_FILE);
+    };
 
 	/// @brief Wrapper for spdlog logger creation
     class Logger {
