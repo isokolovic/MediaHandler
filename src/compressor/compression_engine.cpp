@@ -50,78 +50,103 @@ namespace media_handler::compressor {
     }
 
     void CompressionEngine::migrate(const std::vector<fs::path>& files) {
-        // Determine number of threads to use (fallback = 4)
+        if (files.empty()) {
+            logger->info("No files to process");
+            return;
+        }
+
+        // Determine number of threads (hardware_concurrency() can return 0 on some exotic platforms)
         unsigned int num_threads = std::thread::hardware_concurrency();
-        if (num_threads == 0) num_threads = 4; 
+        if (num_threads == 0) num_threads = 4;
 
         logger->info("Starting migration of {} files using {} threads", files.size(), num_threads);
 
-        // Shared queue of work items (file paths)
+        // === Thread-pool + work-queue pattern ===
+        // We use a single shared queue + condition variable so threads can safely
+        // pick up work without busy-waiting. This is a classic producer-consumer setup.
         std::queue<fs::path> work;
-        for (auto& f : files) work.push(f);
+        for (const auto& f : files) work.push(f);
 
-		std::mutex m; // make sure only one thread can access the queue at a time
-        std::condition_variable cv; // lets worker sleep until there's work available
-		bool done = false; // signals no more work will be added
-        std::latch finished(num_threads); // latch ensures we wait until all workers finish
-        // TODO why not std::latch finished(static_cast<std::ptrdiff_t>(num_threads));
+        std::mutex m;                     // protects the work queue and 'done' flag
+        std::condition_variable cv;       // workers sleep here until work is available
+        bool done = false;                // main thread sets this when no more files will be added
+        std::latch finished(static_cast<std::ptrdiff_t>(num_threads));
+        // std::latch constructor expects std::ptrdiff_t.
+        // We cast to suppress narrowing warnings on compilers that treat
+        // unsigned → signed conversion strictly.
 
-        // Create a single ImageProcessor instance (thread-safe process method) 
-        media_handler::compressor::ImageProcessor image_processor(config, logger); 
+        // Single shared ImageProcessor (its compress() method is thread-safe)
+        media_handler::compressor::ImageProcessor image_processor(config, logger);
 
-        // Worker lambda: each thread repeatedly pops files and processes them
+        // Worker lambda - each thread runs this until the queue is empty and done == true
         auto worker = [this, &work, &m, &cv, &done, &finished, &image_processor]() {
             while (true) {
                 fs::path file;
                 {
-					std::unique_lock<std::mutex> lock(m); // lock the queue
-					cv.wait(lock, [&] { return !work.empty() || done; }); // wait for work or done signal
-                    if (done && work.empty()) break;
-                    file = work.front();
-					work.pop(); // pop the file from queue
-                }
-                logger->info("[THREAD] Processing: {}", file.filename().string());
+                    std::unique_lock<std::mutex> lock(m);
+                    cv.wait(lock, [&] { return !work.empty() || done; });
 
-                try { 
-                    fs::path output = config.output_dir / file.filename(); 
-					auto res = image_processor.compress(file, output);
-                        
-                    if (res.success) { 
-                        logger->info("[THREAD] Done: {}", file.filename().string()); 
-                    } 
-                    else { 
-                        logger->warn("[THREAD] Failed: {} reason: {}", file.filename().string(), res.message); 
-                    } 
-                } 
-                catch (const std::exception& e) { 
-                    logger->error("[THREAD] Exception processing {}: {}", file.string(), e.what()); 
-                }
-                catch (...) { 
-                    logger->error("[THREAD] Unknown exception processing {}", file.string()); 
+                    if (done && work.empty()) break;   // No more work
+
+                    file = std::move(work.front());
+                    work.pop();
                 }
 
-				// TODO : actual migration logic here
-                //std::this_thread::sleep_for(std::chrono::milliseconds(50)); 
+                try {
+                    // Preserve original directory structure (important with recursive scan!)
+                    fs::path relative = fs::relative(file, config.input_dir);
+                    fs::path output = config.output_dir / relative;
+                    fs::create_directories(output.parent_path());
 
-                logger->info("[THREAD] Done: {}", file.filename().string());
+                    logger->info("[THREAD] Processing: {}", relative.string());
+
+                    // If destination already exists and is smaller, it is already compressed -> skip
+                    if (fs::exists(output)) {
+                        const auto src_size = fs::file_size(file);
+                        const auto dst_size = fs::file_size(output);
+
+                        if (dst_size < src_size) {
+                            logger->info("[THREAD] Skipping (already compressed): {} ({} < {})",
+                                relative.string(), dst_size, src_size);
+                            continue;
+                        }
+                        logger->info("[THREAD] Overwriting (destination larger/equal): {}", relative.string());
+                    }
+
+                    auto res = image_processor.compress(file, output);
+
+                    if (res.success) {
+                        logger->info("[THREAD] Success: {}", relative.string());
+                    }
+                    else {
+                        logger->warn("[THREAD] Failed: {} → {}", relative.string(), res.message);
+                    }
+                }
+                catch (const std::exception& e) {
+                    logger->error("[THREAD] Exception on {}: {}", file.string(), e.what());
+                }
+                catch (...) {
+                    logger->error("[THREAD] Unknown exception on {}", file.string());
+                }
             }
 
-            finished.count_down(); // signal this worker is done
+            finished.count_down();   // Signal this worker has finished
             };
 
-        // Launch worker threads
+        // Launch all worker threads
         std::vector<std::jthread> threads;
-        for (unsigned int i = 0; i < num_threads; ++i)
+        for (unsigned int i = 0; i < num_threads; ++i) {
             threads.emplace_back(worker);
+        }
 
+        // Tell workers we are done feeding the queue
         {
-			std::lock_guard<std::mutex> lock(m); // lock to set done flag
+            std::lock_guard<std::mutex> lock(m);
             done = true;
         }
         cv.notify_all();
 
-        finished.wait(); // wait until all workers have signaled completion
-
+        finished.wait();   // Block until every worker has called count_down()
         logger->info("Migration complete");
     }
 
