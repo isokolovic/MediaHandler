@@ -22,12 +22,16 @@ namespace media_handler::compressor {
         std::shared_ptr<spdlog::logger> logger;
 
         // Supported types
-        static constexpr std::array<const char*, 8> video_exts = {
-            ".mp4", ".avi", ".mov", ".mkv", ".webm", ".flv", ".wmv", ".m4v"
+
+        // Will be compressed: 
+        static constexpr std::array<const char*, 4> video_exts = {
+            ".mp4", ".avi", ".mov", ".mkv"
         };
         static constexpr std::array<const char*, 5> image_exts = {
-            ".jpg", ".jpeg", ".png", ".webp", ".heic"
+            ".jpg", ".jpeg", ".png", ".heic", ".heif"
         };
+
+        // Will be copied raw: 
         static constexpr std::array<const char*, 4> audio_exts = {
             ".mp3", ".aac", ".wav", ".flac"
         };
