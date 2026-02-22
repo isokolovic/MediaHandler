@@ -1,25 +1,19 @@
 # pragma once
-
 #include "utils/config.h"
+#include "utils/process_result.h"
 #include "compressor/compression_engine.h"
 #include <png.h>
 #include <cstdio>
 #include <vector>
 #include <setjmp.h>
 
+using namespace media_handler::utils;
+
 namespace media_handler::compressor {
 
 	constexpr int PHOTO_QUALITY = 80; 
 	constexpr int PHOTO_TRIM_WIDTH = 1920; 
 	constexpr int PHOTO_TRIM_HEIGHT = 1080;
-
-	struct ProcessResult {
-		bool success;
-		std::string message;
-		static ProcessResult OK() { return { true, {} }; }
-		static ProcessResult Error(std::string msg) { return { false, std::move(msg) }; }
-	};
-
 
 	class ImageProcessor {
 	public:

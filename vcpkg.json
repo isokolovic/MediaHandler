@@ -6,7 +6,10 @@
     "libjpeg-turbo",
     "libheif",
     "libexif",
-    "ffmpeg",
+    {
+      "name": "ffmpeg",
+      "features": ["x264"]
+    },
     "libpng",
     "spdlog",
     "cli11",
