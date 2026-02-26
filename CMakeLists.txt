@@ -71,6 +71,8 @@ if(BUILD_TESTS)
         tests/test_common.cpp
         tests/test_config.cpp
         tests/test_logger.cpp
+        tests/test_progress_tracker.cpp
+        tests/test_retry_mode.cpp
         src/compressor/compression_engine.cpp
         src/compressor/video_processor.cpp
         src/compressor/image_processor.cpp
