@@ -349,9 +349,9 @@ namespace media_handler::compressor {
 
             if (!packet || !frame || !scaled_frame) {
                 if (scaled_frame) av_frame_free(&scaled_frame);
-                if (frame)        av_frame_free(&frame);
-                if (packet)       av_packet_free(&packet);
-                if (sws_ctx)      sws_freeContext(sws_ctx);
+                if (frame) av_frame_free(&frame);
+                if (packet) av_packet_free(&packet);
+                if (sws_ctx) sws_freeContext(sws_ctx);
                 av_write_trailer(output_ctx);
                 if (output_ctx->pb) avio_closep(&output_ctx->pb);
                 avcodec_free_context(&encoder_ctx);
@@ -406,9 +406,7 @@ namespace media_handler::compressor {
                         AVFrame* send_frame = nullptr;
                         if (sws_ctx) {
                             av_frame_make_writable(scaled_frame);
-                            sws_scale(sws_ctx,
-                                frame->data, frame->linesize, 0, decoder_ctx->height,
-                                scaled_frame->data, scaled_frame->linesize);
+                            sws_scale(sws_ctx, frame->data, frame->linesize, 0, decoder_ctx->height, scaled_frame->data, scaled_frame->linesize);
                             scaled_frame->pts = enc_pts;
                             scaled_frame->pict_type = AV_PICTURE_TYPE_NONE;
                             send_frame = scaled_frame;

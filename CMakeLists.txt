@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.31)
 project(MediaHandler LANGUAGES CXX)
-
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -26,6 +25,8 @@ target_sources(${PROJECT_NAME}
         src/utils/config.cpp
         src/utils/logger.cpp
         src/utils/app_args.cpp
+        src/utils/retry_log.cpp
+        src/utils/progress_tracker.cpp
         src/compressor/compression_engine.cpp
         src/compressor/video_processor.cpp
         src/compressor/image_processor.cpp
@@ -37,7 +38,6 @@ target_include_directories(${PROJECT_NAME}
         ${FFMPEG_INCLUDE_DIRS}
 )
 
-# Link libraries
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
         spdlog::spdlog
@@ -49,7 +49,6 @@ target_link_libraries(${PROJECT_NAME}
         ${FFMPEG_LIBRARIES}
 )
 
-# IDE folder grouping
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 add_custom_command(
@@ -64,7 +63,7 @@ if(BUILD_TESTS)
     enable_testing()
     find_package(GTest CONFIG REQUIRED)
     find_package(nlohmann_json CONFIG REQUIRED)
-    
+
     add_executable(media_handler_tests
         tests/test_video_compressor.cpp
         tests/test_image_compressor.cpp
@@ -78,15 +77,17 @@ if(BUILD_TESTS)
         src/utils/app_args.cpp
         src/utils/config.cpp
         src/utils/logger.cpp
+        src/utils/retry_log.cpp        
+        src/utils/progress_tracker.cpp 
     )
-    
+
     target_include_directories(media_handler_tests
         PRIVATE
             ${PROJECT_SOURCE_DIR}/tests
             ${PROJECT_SOURCE_DIR}/include
             ${FFMPEG_INCLUDE_DIRS}
     )
-    
+
     target_link_libraries(media_handler_tests
         PRIVATE
             GTest::gtest_main
@@ -99,12 +100,12 @@ if(BUILD_TESTS)
             unofficial::libexif::libexif
             ${FFMPEG_LIBRARIES}
     )
-    
+
     add_custom_command(
         TARGET media_handler_tests POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "${PROJECT_SOURCE_DIR}/config.json"
                 "$<TARGET_FILE_DIR:media_handler_tests>/config.json")
-        
+
     add_test(NAME media_handler_tests COMMAND media_handler_tests)
 endif()
