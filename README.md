@@ -1,70 +1,78 @@
-# Media Files Handler
+## Media Files Handler
 **For those low on space and done with paying for cloud storage.**
 
 ---
 
 Batch compress and organize multimedia files while preserving folder structure. Also available in [Python](../../tree/py) and [C](../../tree/c).
 
----
+Multithreaded processing via a shared work queue. Compression via FFmpeg (video) and libjpeg/libheif (images). Run state is persisted after every file — interrupted jobs resume where they left off.
 
-## Modes
+**Example Usage:**
+- Specify the source and destination directories via CLI or `config.json`
+- The tool compresses multimedia files from the source folder and recreates the folder structure at the destination
 
-| Mode | Flag | Description |
-|---|---|---|
-| **Compress** | *(default)* | Compress all media in source, recreate folder structure at destination. Skips already-compressed files on re-run. |
-| **Retry** | `-r` | Re-attempt only the files that failed in the previous run. |
-| **Organize** | `--organize` | Move files into `destination/YYYY/` subfolders based on creation date. No compression. **Source files are moved — original folder structure is removed.** |
-
----
-
-## Setup
-
-### Windows
-
-Install [vcpkg](https://github.com/microsoft/vcpkg) and add it to `PATH`. All libraries are resolved automatically at configure time via `vcpkg.json`.
-
-### Linux
-
-```bash
-sudo apt install libjpeg-dev libheif-dev libexif-dev \
-  libavcodec-dev libavformat-dev libavutil-dev libswscale-dev \
-  libpng-dev libspdlog-dev nlohmann-json3-dev
-```
-
-### Build
-
-```bash
-mkdir build && cd build
-cmake ..
-cmake --build .
-```
+**Modes:**
+- **Retry Mode:** run with additional `-r` argument to retry compression for failed files. Progress is tracked in `.mediahandler_state` in the output directory — do not delete this file between runs.
+- **Organize Mode:** run with additional `--organize` argument to sort files into folders by creation year. **Beware**, files will be moved from the existing folder structure to a new one — source files are not retained.
 
 ---
 
-## Usage
+**Setup Instructions**
 
-```bash
-./media_handler --input /source --output /dest [options]
-```
+1. **Install Build Tools**:
+   - **Windows**: Install [CMake](https://cmake.org/download/). Add to `PATH`.
+   - **Linux**: Run `sudo apt update && sudo apt install cmake`.
 
-| Flag | Default | Description |
-|---|---|---|
-| `-i, --input` | `config.json` value | Source directory. |
-| `-o, --output` | `config.json` value | Destination directory. |
-| `-t, --threads` | CPU count | Number of parallel worker threads. |
-| `--crf` | `23` | Video quality (0–51). Lower = better quality, larger file. 18–28 is the practical range. |
-| `--preset` | `medium` | FFmpeg encoding preset. Trades encoding speed for compression efficiency (`ultrafast` → `veryslow`). |
-| `-r, --retry` | — | Reprocess only files that failed in the last run. Progress is tracked in `.mediahandler_state` in the output directory — do not delete this file between runs. |
-| `-j, --json` | — | Emit logs as JSON (one object per line) instead of plain text. |
-| `--organize` | — | Move files into `output/YYYY/` by creation date. **Source files are moved, not copied.** |
+2. **Install Dependencies**:
+   - **Windows**: Install [vcpkg](https://github.com/microsoft/vcpkg) and add it to `PATH`:
+     ```cmd
+     cd C:\
+     git clone https://github.com/microsoft/vcpkg.git
+     cd vcpkg
+     .\bootstrap-vcpkg.bat
+     ```
+     All libraries are resolved automatically at configure time via the `vcpkg.json`. 
+   - **Linux**:
+     ```bash
+     git clone https://github.com/microsoft/vcpkg.git
+     cd vcpkg
+     ./bootstrap-vcpkg.sh
+     export VCPKG_ROOT=$(pwd)
+     export PATH=$VCPKG_ROOT:$PATH
+     ```
 
-Logs are written to `media_handler.log` in the working directory, alongside plain-text console output.
+3. **Build and Run**:
+   - In a terminal, navigate to the project folder:
+     ```bash
+     cd path/to/project/folder
+     ```
+   - Build the project:
+     - **Windows**:
+       ```cmd
+       mkdir build
+       cd build
+       cmake ..
+       cmake --build .
+       ```
+     - **Linux**:
+       ```bash
+       mkdir build && cd build && cmake .. && cmake --build .
+       ```
+   - Run the executable:
+     - **Windows**:
+       ```cmd
+       .\media_handler.exe --input C:\source --output C:\dest [-r | --organize]
+       ```
+     - **Linux**:
+       ```bash
+       ./media_handler --input /source --output /dest [-r | --organize]
+       ```
 
 ---
 
-## Configuration
+**Configuration**
 
-All options can be set in `config.json` at the project root. CLI flags are overwritten by config file values.
+All options can be set in `config.json` at the project root. CLI flags override config values.
 
 ```json
 {
@@ -79,3 +87,17 @@ All options can be set in `config.json` at the project root. CLI flags are overw
 ```
 
 All fields are optional — omitted values fall back to defaults.
+
+flag | default | description
+--- | --- | ---
+`-i, --input` | config.json | source directory
+`-o, --output` | config.json | destination directory
+`-t, --threads` | cpu count | number of parallel worker threads
+`--crf` | 23 | video quality 0–51, lower = better quality, larger file, practical range 18–28
+`--preset` | medium | ffmpeg encoding preset, trades speed for compression efficiency (`ultrafast` → `veryslow`)
+`-r, --retry` | | reprocess only files that failed in the last run
+`-j, --json` | | emit logs as json, one object per line, useful for log aggregation
+`-l, --log-level` | info | verbosity: `trace` `debug` `info` `warn` `error` `critical`
+`--organize` | | move files into `output/YYYY/` by creation date. Files are not compressed, only moved. 
+
+Logs are written to `media_handler.log` in the working directory alongside console output.
