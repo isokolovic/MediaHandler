@@ -2,6 +2,7 @@
 #include "compressor/image_processor.h"
 #include "compressor/video_processor.h"
 #include "utils/retry_log.h"
+#include "utils/organizer.h"
 #include "utils/progress_tracker.h"
 #include "utils/utils.h"
 #include <algorithm>
@@ -54,8 +55,20 @@ namespace media_handler::compressor {
     }
 
     void CompressionEngine::migrate(const std::vector<fs::path>& files, const MigrateOptions& opts) {
-        
+
         if (files.empty()) { logger->info("No files to process"); return; }
+
+        // Organize-only mode: move files into output_dir/<YYYY>/ with no compression.
+        if (opts.organize && !opts.retry) {
+            Organizer organizer(logger);
+            for (const auto& file : files) {
+                auto result = organizer.organize(file, config.output_dir);
+                if (!result.success)
+                    logger->warn("Organize failed for {}: {}", file.filename().string(), result.error);
+            }
+            logger->info("Organize complete");
+            return;
+        }
 
         // Load state from prior run.
         // Normal run: skip completed files (resume after crash).
@@ -85,7 +98,7 @@ namespace media_handler::compressor {
 
         ProgressTracker tracker(files.size(), logger);
         for (std::size_t i = 0; i < pre_skipped; ++i) tracker.skip_file(files[i]);
-                
+
         // hardware_concurrency() can return 0 on some exotic platforms - fall back to 4.
         unsigned int num_threads = std::thread::hardware_concurrency();
         if (num_threads == 0) num_threads = 4;
@@ -96,12 +109,12 @@ namespace media_handler::compressor {
         // A single shared queue + condition variable = threads safely pick up work without busy-waiting. Producer (main thread) - Consumer (workers)
         // Queue is fully populated before workers start
         std::queue<fs::path> work;
-        for (const auto& f : files) work.push(f);
+        for (const auto& f : work_files) work.push(f);
 
         std::mutex queue_mutex; // Protects the work queue and 'done' flag.
         std::condition_variable cv; // Workers sleep here until work is available.
         bool done = false; // Set by main thread once no more files will be added.
-        std::mutex state_mutex; // Serializes RetryLog reads/writes - separate from queue_mutex
+        std::mutex state_mutex; // Serializes RetryLog and Organizer calls - separate from queue_mutex
 
         // std::latch counts down once per worker on exit so the main thread can block until all workers have finished without needing join() on each thread.
         // Cast to std::ptrdiff_t to suppress narrowing warnings on strict compilers.
@@ -112,82 +125,79 @@ namespace media_handler::compressor {
         VideoProcessor video_proc(config, logger);
 
         // Worker lambda - each thread pulls from the shared queue until it is empty and 'done' is set. Done + empty = no more work will ever arrive.
-        auto worker = [this, &work, &queue_mutex, &cv, &done, &finished, &image_proc, &video_proc, &retry_log, &state_mutex, &tracker, &opts]() {
-            while (true) {
-                fs::path file;
+        auto worker = [this, &work, &queue_mutex, &cv, &done, &finished, &image_proc, &video_proc, &retry_log, &state_mutex, &tracker, &opts]()
+            {
+                while (true) {
+                    fs::path file;
 
-                {
-                    std::unique_lock<std::mutex> lock(queue_mutex);
+                    {
+                        std::unique_lock<std::mutex> lock(queue_mutex);
 
-                    // Sleep until there is something to process or the producer signals done.
-                    // Predicate is rechecked on every wake to guard against spurious wakeups.
-                    cv.wait(lock, [&] { return !work.empty() || done; });
+                        // Sleep until there is something to process or the producer signals done.
+                        // Predicate is rechecked on every wake to guard against spurious wakeups.
+                        cv.wait(lock, [&] { return !work.empty() || done; });
 
-                    if (done && work.empty()) break; // No more work will ever arrive.
+                        if (done && work.empty()) break; // No more work will ever arrive.
 
-                    file = std::move(work.front());
-                    work.pop();
-                }
-
-                try {
-                    // Preserve original directory structure (important with recursive scan!)
-                    fs::path relative = fs::relative(file, config.input_dir);
-                    fs::path output = config.output_dir / relative;
-                    fs::create_directories(output.parent_path());
-
-                    logger->info("[THREAD] Processing: {}", relative.string());
-
-                    // If the destination already exists and is smaller than the source, it has already been compressed on a previous run - skip it.
-                    if (fs::exists(output)) {
-                        const auto src_size = fs::file_size(file);
-                        const auto dst_size = fs::file_size(output);
-
-                        if (dst_size < src_size) {
-                            logger->info("[THREAD] Skipping (already compressed): {} ({} < {})",
-                                relative.string(), dst_size, src_size);
-                            continue;
-                        }
-
-                        logger->info("[THREAD] Overwriting (destination larger/equal): {}", relative.string());
+                        file = std::move(work.front());
+                        work.pop();
                     }
 
-                    auto token = tracker.begin_file(file);
+                    try {
+                        // Preserve original directory structure (important with recursive scan!)
+                        fs::path relative = fs::relative(file, config.input_dir);
+                        fs::path output = config.output_dir / relative;
+                        fs::create_directories(output.parent_path());
 
-                    // Lowercase extension and use the supported types lists
-                    auto ext = file.extension().string();
-                    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });
+                        logger->info("[THREAD] Processing: {}", relative.string());
 
-                    ProcessResult res;
-                    if (ext_matches(video_exts, ext))
-                        res = video_proc.compress(file, output);
-                    else                        
-                        res = image_proc.compress(file, output);
+                        // If the destination already exists and is smaller than the source, it has already been compressed on a previous run - skip it.
+                        if (fs::exists(output)) {
+                            const auto src_size = fs::file_size(file);
+                            const auto dst_size = fs::file_size(output);
 
-                    tracker.finish_file(token, output, res.success, res.message);
+                            if (dst_size < src_size) {
+                                logger->info("[THREAD] Skipping (already compressed): {} ({} < {})",
+                                    relative.string(), dst_size, src_size);
+                                continue;
+                            }
+
+                            logger->info("[THREAD] Overwriting (destination larger/equal): {}", relative.string());
+                        }
+
+                        auto token = tracker.begin_file(file);
+
+                        // Lowercase extension and use the supported types lists
+                        auto ext = file.extension().string();
+                        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });
+
+                        ProcessResult res;
+                        if (ext_matches(video_exts, ext))
+                            res = video_proc.compress(file, output);
+                        else
+                            res = image_proc.compress(file, output);
+
+                        tracker.finish_file(token, output, res.success, res.message);
 
                     // Save state after every file
-                    {
-                        std::lock_guard lock(state_mutex);
+                        {
+                            std::lock_guard lock(state_mutex);
 
-                        if (res.success) {
-                            retry_log.mark_completed(file);
-                        }
-                        else {
-                            retry_log.mark_failed(file);
-                        }
+                            if (res.success) retry_log.mark_completed(file);
+                            else retry_log.mark_failed(file);
 
-                        retry_log.save();
+                            retry_log.save();
+                        }
+                    }
+                    catch (const std::exception& e) {
+                        logger->error("[THREAD] Exception on {}: {}", file.string(), e.what());
+                    }
+                    catch (...) {
+                        logger->error("[THREAD] Unknown exception on {}", file.string());
                     }
                 }
-                catch (const std::exception& e) {
-                    logger->error("[THREAD] Exception on {}: {}", file.string(), e.what());
-                }
-                catch (...) {
-                    logger->error("[THREAD] Unknown exception on {}", file.string());
-                }
-            }
 
-            finished.count_down(); // Signal this worker has finished.
+                finished.count_down(); // Signal this worker has finished.
             };
 
         // Launch all worker threads. std::jthread auto-joins on destruction, but we wait on the latch below so all work is done before we return.
@@ -207,12 +217,13 @@ namespace media_handler::compressor {
 
         // Block until every worker has called count_down().
         finished.wait();
-        
-        if (retry_log.failed_count() > 0){
-            logger->warn("{} file(s) failed — run with --retry", retry_log.failed_count());
-        }
 
-        logger->info("Migration complete");        
+        tracker.print_summary();
+
+        if (retry_log.failed_count() > 0)
+            logger->warn("{} file(s) failed — run with --retry", retry_log.failed_count());
+
+        logger->info("Migration complete");
     }
 
 } // namespace media_handler::compressor
