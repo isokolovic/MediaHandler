@@ -70,10 +70,12 @@ namespace media_handler::compressor {
 
             int video_stream_index = -1;
             int ret = 0;
-                        
-            // Open input
 
-            ret = avformat_open_input(&input_ctx, input.string().c_str(), nullptr, nullptr);
+            // Open input
+            const std::string input_utf8 = utils::path_to_utf8(input);
+            const std::string output_utf8 = utils::path_to_utf8(output);
+
+            ret = avformat_open_input(&input_ctx, input_utf8.c_str(), nullptr, nullptr);
             if (ret < 0)
                 return ProcessResult::Error(std::format("Failed to open input file: {}", ret));
 
@@ -149,8 +151,7 @@ namespace media_handler::compressor {
             }
 
             // Output context + global metadata
-
-            avformat_alloc_output_context2(&output_ctx, nullptr, nullptr, output.string().c_str());
+            avformat_alloc_output_context2(&output_ctx, nullptr, nullptr, output_utf8.c_str());
             if (!output_ctx) {
                 avcodec_free_context(&decoder_ctx);
                 avformat_close_input(&input_ctx);
@@ -177,29 +178,21 @@ namespace media_handler::compressor {
                     stream_map[i] = out_stream->index;
                 }
                 else {
-                    AVStream* out_s = avformat_new_stream(output_ctx, nullptr);
-                    if (!out_s) continue;
-                    ret = avcodec_parameters_copy(out_s->codecpar, in_s->codecpar);
-                    if (ret < 0) continue;
-                    out_s->codecpar->codec_tag = 0;
-                    out_s->time_base = in_s->time_base;
-                    av_dict_copy(&out_s->metadata, in_s->metadata, 0);
-                    stream_map[i] = out_s->index;
+                    AVStream* new_s = avformat_new_stream(output_ctx, nullptr);
+                    if (!new_s) continue;
+                    avcodec_parameters_copy(new_s->codecpar, in_s->codecpar);
+                    new_s->time_base = in_s->time_base;
+                    stream_map[i] = new_s->index;
                 }
             }
 
-            // Encoder selection — hardware first, software fallback
-            const char* encoder_names[] = { "h264_nvenc", "h264_amf", "h264_qsv", "libx264", nullptr };
-            for (int i = 0; encoder_names[i]; i++) {
-                encoder = avcodec_find_encoder_by_name(encoder_names[i]);
-                if (encoder) { logger->info("Using encoder: {}", encoder_names[i]); break; }
-            }
-
+            // Encoder setup
+            encoder = avcodec_find_encoder_by_name(config.video_codec.c_str());
             if (!encoder) {
                 avformat_free_context(output_ctx);
                 avcodec_free_context(&decoder_ctx);
                 avformat_close_input(&input_ctx);
-                return ProcessResult::Error("No H.264 encoder found");
+                return ProcessResult::Error(std::format("Encoder not found: {}", config.video_codec));
             }
 
             encoder_ctx = avcodec_alloc_context3(encoder);
@@ -213,95 +206,35 @@ namespace media_handler::compressor {
             encoder_ctx->width = decoder_ctx->width;
             encoder_ctx->height = decoder_ctx->height;
             encoder_ctx->pix_fmt = AV_PIX_FMT_YUV420P;
-
-            AVRational frame_rate = av_guess_frame_rate(input_ctx, in_stream, nullptr);
-            if (frame_rate.num <= 0 || frame_rate.den <= 0) frame_rate = in_stream->avg_frame_rate;
-            if (frame_rate.num <= 0 || frame_rate.den <= 0) {
-                logger->warn("Could not determine frame rate, defaulting to 30 fps");
-                frame_rate = { 30, 1 };
-            }
-            encoder_ctx->time_base = av_inv_q(frame_rate);
-            encoder_ctx->framerate = frame_rate;
+            encoder_ctx->time_base = { 1, 90000 };
+            encoder_ctx->framerate = in_stream->avg_frame_rate;
+            encoder_ctx->bit_rate = target_bitrate;
+            encoder_ctx->rc_max_rate = max_bitrate;
+            encoder_ctx->rc_buffer_size = static_cast<int>(buf_size);
             encoder_ctx->thread_count = 0;
+
+            AVDictionary* enc_opts = nullptr;
+            av_dict_set(&enc_opts, "preset", config.video_preset.c_str(), 0);
+            av_dict_set(&enc_opts, "crf", config.crf.c_str(), 0);
 
             if (output_ctx->oformat->flags & AVFMT_GLOBALHEADER)
                 encoder_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
-            std::string encoder_name = encoder->name;
-
-            if (encoder_name == "h264_nvenc") {
-                // p4 balances speed and compression.
-                av_opt_set(encoder_ctx->priv_data, "preset", "p4", 0);
-                av_opt_set(encoder_ctx->priv_data, "tune", "hq", 0);
-                av_opt_set(encoder_ctx->priv_data, "rc", "vbr", 0);
-                av_opt_set_int(encoder_ctx->priv_data, "cq", 36, 0);
-                av_opt_set_int(encoder_ctx->priv_data, "b", target_bitrate, 0);
-                av_opt_set_int(encoder_ctx->priv_data, "maxrate", max_bitrate, 0);
-                av_opt_set_int(encoder_ctx->priv_data, "bufsize", buf_size, 0);
-                av_opt_set_int(encoder_ctx->priv_data, "max_b_frames", 0, 0);
-                encoder_ctx->bit_rate = target_bitrate;
-                logger->info("NVENC: cq=36, target={}kbps, max={}kbps", target_bitrate / 1000, max_bitrate / 1000);
-            }
-            else if (encoder_name == "h264_amf") {
-                av_opt_set(encoder_ctx->priv_data, "quality", "balanced", 0);
-                av_opt_set(encoder_ctx->priv_data, "rc", "vbr_latency", 0);
-                av_opt_set_int(encoder_ctx->priv_data, "qp_i", 34, 0);
-                av_opt_set_int(encoder_ctx->priv_data, "qp_p", 36, 0);
-                av_opt_set_int(encoder_ctx->priv_data, "qp_b", 38, 0);
-                av_opt_set_int(encoder_ctx->priv_data, "max_b_frames", 0, 0);
-                encoder_ctx->bit_rate = target_bitrate;
-                logger->info("AMF: qp=34/36/38, target={}kbps", target_bitrate / 1000);
-            }
-            else if (encoder_name == "h264_qsv") {
-                av_opt_set(encoder_ctx->priv_data, "preset", "fast", 0);
-                av_opt_set_int(encoder_ctx->priv_data, "global_quality", 36, 0);
-                av_opt_set_int(encoder_ctx->priv_data, "max_b_frames", 0, 0);
-                encoder_ctx->bit_rate = target_bitrate;
-                logger->info("QSV: quality=36, target={}kbps", target_bitrate / 1000);
-            }
-            else if (encoder_name == "libx264") {
-                // 'faster': better compression than 'ultrafast'; 3x faster than 'medium'.
-                // CRF 33: targets 40% perceived quality.
-                // Maxrate: caps size spikes at 50% source bitrate.
-                encoder_ctx->bit_rate = 0; // pure CRF mode
-                encoder_ctx->rc_max_rate = max_bitrate;
-                encoder_ctx->rc_buffer_size = (int)buf_size;
-                av_opt_set_int(encoder_ctx->priv_data, "crf", 33, 0);
-                av_opt_set(encoder_ctx->priv_data, "preset", "faster", 0);
-                av_opt_set(encoder_ctx->priv_data, "tune", "fastdecode", 0);
-                logger->info("libx264: crf=33, preset=faster, maxrate={}kbps", max_bitrate / 1000);
-            }
-            else {
-                encoder_ctx->bit_rate = target_bitrate;
-                encoder_ctx->rc_max_rate = max_bitrate;
-                encoder_ctx->rc_buffer_size = (int)buf_size;
-                logger->warn("Unknown encoder '{}', target={}kbps", encoder_name, target_bitrate / 1000);
-            }
-
-            ret = avcodec_open2(encoder_ctx, encoder, nullptr);
+            ret = avcodec_open2(encoder_ctx, encoder, &enc_opts);
+            av_dict_free(&enc_opts);
             if (ret < 0) {
                 avcodec_free_context(&encoder_ctx);
                 avformat_free_context(output_ctx);
                 avcodec_free_context(&decoder_ctx);
                 avformat_close_input(&input_ctx);
-                return ProcessResult::Error(std::format("Failed to open encoder: {}", ret));
+                return ProcessResult::Error("Failed to open encoder");
             }
 
-            ret = avcodec_parameters_from_context(out_stream->codecpar, encoder_ctx);
-            if (ret < 0) {
-                avcodec_free_context(&encoder_ctx);
-                avformat_free_context(output_ctx);
-                avcodec_free_context(&decoder_ctx);
-                avformat_close_input(&input_ctx);
-                return ProcessResult::Error("Failed to copy encoder parameters");
-            }
-
+            avcodec_parameters_from_context(out_stream->codecpar, encoder_ctx);
             out_stream->time_base = encoder_ctx->time_base;
-            av_dict_copy(&out_stream->metadata, in_stream->metadata, 0); // rotation, lang, etc.
 
-            // Open output file
             if (!(output_ctx->oformat->flags & AVFMT_NOFILE)) {
-                ret = avio_open(&output_ctx->pb, output.string().c_str(), AVIO_FLAG_WRITE);
+                ret = avio_open(&output_ctx->pb, output_utf8.c_str(), AVIO_FLAG_WRITE);
                 if (ret < 0) {
                     avcodec_free_context(&encoder_ctx);
                     avformat_free_context(output_ctx);

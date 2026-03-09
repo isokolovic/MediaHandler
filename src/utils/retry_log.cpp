@@ -1,4 +1,5 @@
 #include "utils/retry_log.h"
+#include "utils/utils.h"
 #include <fstream>
 #include <format>
 #include <nlohmann/json.hpp>
@@ -12,20 +13,21 @@ namespace media_handler::utils {
 
     RetryLog::RetryLog(const fs::path& output_dir, std::shared_ptr<spdlog::logger> logger)
         : state_file(output_dir / STATE_FILE)
-        , logger(std::move(logger)) {}
+        , logger(std::move(logger)) {
+    }
 
     std::string RetryLog::normalize(const fs::path& p) {
         std::error_code ec;
         auto cp = fs::weakly_canonical(p, ec);
 
-        return ec ? p.string() : cp.string();
+        return ec ? path_to_utf8(p) : path_to_utf8(cp);
     }
 
     void RetryLog::load() {
         std::error_code ec;
         if (!fs::exists(state_file, ec)) {
-            logger->info("No state file — fresh run"); 
-            return; 
+            logger->info("No state file — fresh run");
+            return;
         }
 
         try {
@@ -68,12 +70,12 @@ namespace media_handler::utils {
         }
     }
 
-    bool RetryLog::is_completed(const fs::path& file) const { 
-        return completed.count(normalize(file)) > 0; 
+    bool RetryLog::is_completed(const fs::path& file) const {
+        return completed.count(normalize(file)) > 0;
     }
 
-    bool RetryLog::is_failed(const fs::path& file) const { 
-        return failed.count(normalize(file)) > 0; 
+    bool RetryLog::is_failed(const fs::path& file) const {
+        return failed.count(normalize(file)) > 0;
     }
 
     void RetryLog::mark_completed(const fs::path& file) {

@@ -13,7 +13,7 @@ namespace media_handler::compressor {
     namespace fs = std::filesystem;
 
     ImageProcessor::ImageProcessor(const utils::Config& cfg, std::shared_ptr<spdlog::logger> logger)
-		: config(cfg), logger(std::move(logger)) { //TODO std::move() to avoid ref-count increment
+		: config(cfg), logger(std::move(logger)) { //std::move() to avoid ref-count increment
     }
 
     static bool file_exists_and_readable(const fs::path& path) {
@@ -38,12 +38,12 @@ namespace media_handler::compressor {
     }
 
     ProcessResult ImageProcessor::compress_jpeg(const fs::path& input, const fs::path& output) {
-        FILE* infile = fopen(input.string().c_str(), "rb");
+        FILE* infile = utils::fopen_path(input, "rb");
         if (!infile) {
             return ProcessResult::Error("Failed to open input JPEG");
         }
 
-        FILE* outfile = fopen(output.string().c_str(), "wb");
+        FILE* outfile = utils::fopen_path(output, "wb");
         if (!outfile) {
             fclose(infile);
             return ProcessResult::Error("Failed to open output JPEG");
@@ -77,17 +77,21 @@ namespace media_handler::compressor {
         jpeg_set_quality(&dstinfo, PHOTO_QUALITY, TRUE);
         jpeg_start_compress(&dstinfo, TRUE);
 
-        // Try to copy EXIF if present
-        ExifData* exif = exif_data_new_from_file(input.string().c_str());
-        if (exif) {
-            unsigned char* exif_buf = nullptr;
-            unsigned int exif_len = 0;
-            exif_data_save_data(exif, &exif_buf, &exif_len);
-            if (exif_buf && exif_len > 6 && memcmp(exif_buf, "Exif\0\0", 6) == 0) {
-                jpeg_write_marker(&dstinfo, JPEG_APP0 + 1, exif_buf, exif_len);
+        {
+            auto exif_buf_raw = utils::read_file_bytes(input);
+            ExifData* exif = exif_buf_raw.empty()
+                ? nullptr
+                : exif_data_new_from_data(exif_buf_raw.data(), static_cast<unsigned int>(exif_buf_raw.size()));
+            if (exif) {
+                unsigned char* exif_out = nullptr;
+                unsigned int exif_len = 0;
+                exif_data_save_data(exif, &exif_out, &exif_len);
+                if (exif_out && exif_len > 6 && memcmp(exif_out, "Exif\0\0", 6) == 0) {
+                    jpeg_write_marker(&dstinfo, JPEG_APP0 + 1, exif_out, exif_len);
+                }
+                if (exif_out) free(exif_out);
+                exif_data_unref(exif);
             }
-            if (exif_buf) free(exif_buf);
-            exif_data_unref(exif);
         }
 
         // allocate buffer for one scanline
@@ -109,8 +113,7 @@ namespace media_handler::compressor {
     }
 
     ProcessResult ImageProcessor::compress_heic(const fs::path& input, const fs::path& output) {
-        // Signature check
-        FILE* f = fopen(input.string().c_str(), "rb");
+        FILE* f = utils::fopen_path(input, "rb");
         if (!f) return ProcessResult::Error("Failed to open HEIC for signature check");
         unsigned char header[12] = { 0 };
         size_t r = fread(header, 1, sizeof(header), f);
@@ -122,7 +125,7 @@ namespace media_handler::compressor {
         heif_context* ctx = heif_context_alloc();
         if (!ctx) return ProcessResult::Error("Failed to allocate heif context");
 
-        heif_error err = heif_context_read_from_file(ctx, input.string().c_str(), nullptr);
+        heif_error err = heif_context_read_from_file(ctx, utils::path_to_utf8(input).c_str(), nullptr);
         if (err.code != heif_error_Ok) {
             heif_context_free(ctx);
             return ProcessResult::Error(std::string("heif read error: ") + (err.message ? err.message : "unknown"));
@@ -160,8 +163,7 @@ namespace media_handler::compressor {
         auto output_jpeg = output;
         output_jpeg.replace_extension(".jpg");
 
-        // Open output JPEG file
-        FILE* outfile = fopen(output_jpeg.string().c_str(), "wb");
+        FILE* outfile = utils::fopen_path(output_jpeg, "wb");
         if (!outfile) {
             heif_image_release(image);
             heif_image_handle_release(handle);
@@ -215,17 +217,16 @@ namespace media_handler::compressor {
         FILE* in_file = NULL;
         FILE* out_file = NULL;
 
-        // Open input file
-        in_file = fopen(input.string().c_str(), "rb");
+        in_file = utils::fopen_path(input, "rb");
         if (!in_file) {
-            return ProcessResult::Error(std::format("Failed to open input file {}: {}", input.string(), strerror(errno)));
+            return ProcessResult::Error(std::format("Failed to open input file {}: {}", utils::path_to_utf8(input), strerror(errno)));
         }
 
         // Check PNG signature
         unsigned char sig[8];
         if (fread(sig, 1, 8, in_file) != 8 || memcmp(sig, "\x89PNG\r\n\x1A\n", 8) != 0) {
             fclose(in_file);
-            return ProcessResult::Error(std::format("File {} is not a valid PNG (missing PNG signature)", input.string()));
+            return ProcessResult::Error(std::format("File {} is not a valid PNG (missing PNG signature)", utils::path_to_utf8(input)));
         }
         rewind(in_file); // Reset file pointer
 
@@ -233,14 +234,14 @@ namespace media_handler::compressor {
         png_read_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
         if (!png_read_ptr) {
             fclose(in_file);
-            return ProcessResult::Error(std::format("Failed to create read structure for file {}", input.string()));
+            return ProcessResult::Error(std::format("Failed to create read structure for file {}", utils::path_to_utf8(input)));
         }
 
         read_info_ptr = png_create_info_struct(png_read_ptr);
         if (!read_info_ptr) {
             png_destroy_read_struct(&png_read_ptr, NULL, NULL);
             fclose(in_file);
-            return ProcessResult::Error(std::format("Failed to create png read info struct for file {}", input.string()));
+            return ProcessResult::Error(std::format("Failed to create png read info struct for file {}", utils::path_to_utf8(input)));
         }
 
         // Error handling for reading
@@ -248,7 +249,7 @@ namespace media_handler::compressor {
             png_destroy_read_struct(&png_read_ptr, &read_info_ptr, NULL);
             if (image_data) free(image_data);
             fclose(in_file);
-            return ProcessResult::Error(std::format("Error reading png file {}", input.string()));
+            return ProcessResult::Error(std::format("Error reading png file {}", utils::path_to_utf8(input)));
         }
 
         png_init_io(png_read_ptr, in_file);
@@ -276,7 +277,7 @@ namespace media_handler::compressor {
         if (!image_data) {
             png_destroy_read_struct(&png_read_ptr, &read_info_ptr, NULL);
             fclose(in_file);
-            return ProcessResult::Error(std::format("Failed to allocate memory for png data in {}", input.string()));
+            return ProcessResult::Error(std::format("Failed to allocate memory for png data in {}", utils::path_to_utf8(input)));
         }
 
         png_bytep* row_pointers = (png_bytep*)malloc(height * sizeof(png_bytep));
@@ -284,7 +285,7 @@ namespace media_handler::compressor {
             free(image_data);
             png_destroy_read_struct(&png_read_ptr, &read_info_ptr, NULL);
             fclose(in_file);
-            return ProcessResult::Error(std::format("Failed to allocate row pointer for {}", input.string()));
+            return ProcessResult::Error(std::format("Failed to allocate row pointer for {}", utils::path_to_utf8(input)));
         }
 
         // Initialize row pointers
@@ -301,12 +302,11 @@ namespace media_handler::compressor {
         png_uint_32 out_width = width > PHOTO_TRIM_WIDTH ? PHOTO_TRIM_WIDTH : width;
         png_uint_32 out_height = height > PHOTO_TRIM_HEIGHT ? PHOTO_TRIM_HEIGHT : height;
 
-        // Open output file
-        out_file = fopen(output.string().c_str(), "wb");
+        out_file = utils::fopen_path(output, "wb");
         if (!out_file) {
             free(image_data);
             free(row_pointers);
-            return ProcessResult::Error(std::format("Failed to open output file {}: {}", output.string(), strerror(errno)));
+            return ProcessResult::Error(std::format("Failed to open output file {}: {}", utils::path_to_utf8(output), strerror(errno)));
         }
 
         // Initialize libpng for writing
@@ -315,7 +315,7 @@ namespace media_handler::compressor {
             free(image_data);
             free(row_pointers);
             fclose(out_file);
-            return ProcessResult::Error(std::format("Failed to create png write struct for {}", output.string()));
+            return ProcessResult::Error(std::format("Failed to create png write struct for {}", utils::path_to_utf8(output)));
         }
 
         write_info_ptr = png_create_info_struct(png_write_ptr);
@@ -324,7 +324,7 @@ namespace media_handler::compressor {
             free(image_data);
             free(row_pointers);
             fclose(out_file);
-            return ProcessResult::Error(std::format("Failed to create png write info struct for {}", output.string()));
+            return ProcessResult::Error(std::format("Failed to create png write info struct for {}", utils::path_to_utf8(output)));
         }
 
         if (setjmp(png_jmpbuf(png_write_ptr))) {
@@ -332,7 +332,7 @@ namespace media_handler::compressor {
             free(image_data);
             free(row_pointers);
             fclose(out_file);
-            return ProcessResult::Error(std::format("Error writing png file {}", output.string()));
+            return ProcessResult::Error(std::format("Error writing png file {}", utils::path_to_utf8(output)));
         }
 
         png_init_io(png_write_ptr, out_file);

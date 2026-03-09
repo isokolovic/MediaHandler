@@ -1,4 +1,5 @@
 #include "utils/organizer.h"
+#include "utils/utils.h"
 #include <libexif/exif-data.h>
 #include <format>
 #include <algorithm>
@@ -52,7 +53,11 @@ namespace media_handler::utils {
         for (auto& c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         if (ext != ".jpg" && ext != ".jpeg") return;
 
-        ExifData* ed = exif_data_new_from_file(file.string().c_str());
+        auto raw = read_file_bytes(file);
+        ExifData* ed = raw.empty()
+            ? nullptr
+            : exif_data_new_from_data(raw.data(), static_cast<unsigned int>(raw.size()));
+
         if (!ed) return;
 
         constexpr ExifTag tags[] = { EXIF_TAG_DATE_TIME_ORIGINAL, EXIF_TAG_DATE_TIME };
@@ -96,7 +101,7 @@ namespace media_handler::utils {
         auto mtime = fs::last_write_time(file, ec);
         if (!ec) out.push_back(from_ftime(mtime));
 
-		// Birth time, platform-specific
+        // Birth time, platform-specific
 #ifdef _WIN32
         HANDLE h = CreateFileW(file.wstring().c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 
@@ -118,8 +123,8 @@ namespace media_handler::utils {
         }
 #elif defined(__linux__) && defined(STATX_BTIME)
         struct statx stx;
-        if (statx(AT_FDCWD, file.string().c_str(), 0, STATX_BTIME, &stx) == 0 && (stx.stx_mask & STATX_BTIME)){
-            out.push_back(from_sys( std::chrono::system_clock::from_time_t(static_cast<time_t>(stx.stx_btime.tv_sec))));
+        if (statx(AT_FDCWD, file.string().c_str(), 0, STATX_BTIME, &stx) == 0 && (stx.stx_mask & STATX_BTIME)) {
+            out.push_back(from_sys(std::chrono::system_clock::from_time_t(static_cast<time_t>(stx.stx_btime.tv_sec))));
         }
 #endif
     }
