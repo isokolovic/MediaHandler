@@ -9,6 +9,10 @@
 #include <format>
 #include <queue>
 #include <latch>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <atomic>
 
 namespace media_handler::compressor {
 
@@ -16,11 +20,10 @@ namespace media_handler::compressor {
     using namespace media_handler::utils;
 
     CompressionEngine::CompressionEngine(const Config& cfg)
-        : config(cfg) // Fill params from config.json
-        , logger(cfg.json_log // Initialize logger
+        : config(cfg)
+        , logger(cfg.json_log
             ? Logger::create_json("Engine", cfg.log_level)
-            : Logger::create("Engine", cfg.log_level)) {
-    }
+            : Logger::create("Engine", cfg.log_level)) {}
 
     bool CompressionEngine::is_supported(const fs::path& p) const {
         auto ext = p.extension().string();
@@ -37,11 +40,11 @@ namespace media_handler::compressor {
         std::vector<fs::path> files;
 
         if (!fs::exists(input_dir)) {
-            logger->error("Input directory does not exist: {}", input_dir.string());
+            logger->error("Input directory does not exist: {}", path_to_utf8(input_dir));
             return files;
         }
 
-        logger->info("Scanning: {}", input_dir.string());
+        logger->info("Scanning: {}", path_to_utf8(input_dir));
 
         for (const auto& entry : fs::recursive_directory_iterator(input_dir, fs::directory_options::skip_permission_denied))
         {
@@ -64,7 +67,7 @@ namespace media_handler::compressor {
             for (const auto& file : files) {
                 auto result = organizer.organize(file, config.output_dir);
                 if (!result.success)
-                    logger->warn("Organize failed for {}: {}", file.filename().string(), result.error);
+                    logger->warn("Organize failed for {}: {}", path_to_utf8(file.filename()), result.error);
             }
             logger->info("Organize complete");
             return;
@@ -88,134 +91,166 @@ namespace media_handler::compressor {
         }
         else {
             for (const auto& f : files) {
-                if (retry_log.is_completed(f)) ++pre_skipped;
-                else work_files.push_back(f);
+                if (retry_log.is_completed(f)) {
+                    ++pre_skipped;
+                }
+                else {
+                    work_files.push_back(f);
+                }
             }
             if (pre_skipped > 0) logger->info("Resuming: {} already done", pre_skipped);
         }
 
         if (work_files.empty()) { logger->info("Nothing to do"); return; }
 
-        ProgressTracker tracker(files.size(), logger);
-        for (std::size_t i = 0; i < pre_skipped; ++i) tracker.skip_file(files[i]);
-
-        // hardware_concurrency() can return 0 on some exotic platforms - fall back to 4.
-        unsigned int num_threads = std::thread::hardware_concurrency();
+        unsigned int num_threads = config.threads;
+        if (num_threads == 0) num_threads = std::thread::hardware_concurrency();
         if (num_threads == 0) num_threads = 4;
 
-        logger->info("Starting migration of {} files using {} threads", files.size(), num_threads);
+        logger->info("Starting migration of {} files using {} threads", work_files.size(), num_threads);
+
+        ProgressTracker tracker(work_files.size(), logger);
+
+        // Mark skipped files explicitly in the tracker so counts are correct.
+        for (const auto& f : files) {
+            if (retry_log.is_completed(f)) {
+                tracker.skip_file(f);
+            }
+        }
 
         // Thread-pool + work-queue pattern.
-        // A single shared queue + condition variable = threads safely pick up work without busy-waiting. Producer (main thread) - Consumer (workers)
-        // Queue is fully populated before workers start
+        // A single shared queue + condition variable = threads safely pick up work without busy-waiting.
+        // Queue is fully populated before workers start.
         std::queue<fs::path> work;
         for (const auto& f : work_files) work.push(f);
 
         std::mutex queue_mutex; // Protects the work queue and 'done' flag.
         std::condition_variable cv; // Workers sleep here until work is available.
         bool done = false; // Set by main thread once no more files will be added.
-        std::mutex state_mutex; // Serializes RetryLog and Organizer calls - separate from queue_mutex
+        std::mutex state_mutex; // Serializes RetryLog and Organizer calls.
 
-        // std::latch counts down once per worker on exit so the main thread can block until all workers have finished without needing join() on each thread.
-        // Cast to std::ptrdiff_t to suppress narrowing warnings on strict compilers.
         std::latch finished(static_cast<std::ptrdiff_t>(num_threads));
 
-        // Shared processors. compress() is thread-safe on both: no mutable state beyond config and logger which are set at construction and never written again.
         ImageProcessor image_proc(config, logger);
         VideoProcessor video_proc(config, logger);
 
-        // Worker lambda - each thread pulls from the shared queue until it is empty and 'done' is set. Done + empty = no more work will ever arrive.
         auto worker = [this, &work, &queue_mutex, &cv, &done, &finished, &image_proc, &video_proc, &retry_log, &state_mutex, &tracker, &opts]()
             {
-                while (true) {
-                    fs::path file;
+                //Wrap the whole loop in a try/catch so OS exceptions can't terminate threads
+                try {
+                    while (true) {
+                        fs::path file;
 
-                    {
-                        std::unique_lock<std::mutex> lock(queue_mutex);
+                        {
+                            std::unique_lock<std::mutex> lock(queue_mutex);
+                            cv.wait(lock, [&] { return !work.empty() || done; });
+                            if (done && work.empty()) break;
+                            file = std::move(work.front());
+                            work.pop();
+                        }
 
-                        // Sleep until there is something to process or the producer signals done.
-                        // Predicate is rechecked on every wake to guard against spurious wakeups.
-                        cv.wait(lock, [&] { return !work.empty() || done; });
+                        try {
+                            fs::path relative;
+                            try {
+                                relative = fs::relative(file, config.input_dir);
+                            }
+                            catch (...) {
+                                relative = file.filename();
+                            }
 
-                        if (done && work.empty()) break; // No more work will ever arrive.
-
-                        file = std::move(work.front());
-                        work.pop();
-                    }
-
-                    try {
-                        // Preserve original directory structure (important with recursive scan!)
-                        fs::path relative = fs::relative(file, config.input_dir);
-                        fs::path output = config.output_dir / relative;
-                        fs::create_directories(output.parent_path());
-
-                        logger->info("[THREAD] Processing: {}", relative.string());
-
-                        // If the destination already exists and is smaller than the source, it has already been compressed on a previous run - skip it.
-                        if (fs::exists(output)) {
-                            const auto src_size = fs::file_size(file);
-                            const auto dst_size = fs::file_size(output);
-
-                            if (dst_size < src_size) {
-                                logger->info("[THREAD] Skipping (already compressed): {} ({} < {})",
-                                    relative.string(), dst_size, src_size);
+                            fs::path output = config.output_dir / relative;
+                            try {
+                                if (!fs::exists(output.parent_path())) {
+                                    fs::create_directories(output.parent_path());
+                                }
+                            }
+                            catch (const std::exception& e) {
+                                logger->error("[THREAD] Filesystem error creating directories for {}: {}", path_to_utf8(output.parent_path()), e.what());
+                                std::lock_guard lock(state_mutex);
+                                retry_log.mark_failed(file);
+                                retry_log.save();
+                                tracker.finish_file(tracker.begin_file(file), output, false, "mkdir failed");
                                 continue;
                             }
 
-                            logger->info("[THREAD] Overwriting (destination larger/equal): {}", relative.string());
+                            logger->info("[THREAD] Processing: {}", path_to_utf8(relative));
+
+                            if (fs::exists(output) && fs::is_regular_file(output) && fs::is_regular_file(file)) {
+                                const auto src_size = fs::file_size(file);
+                                const auto dst_size = fs::file_size(output);
+
+                                if (dst_size < src_size) {
+                                    logger->info("[THREAD] Skipping (already compressed): {} ({} < {})", path_to_utf8(relative), dst_size, src_size);
+                                    tracker.finish_file(tracker.begin_file(file), output, true, "skipped (already compressed)");
+                                    continue;
+                                }
+
+                                logger->info("[THREAD] Overwriting (destination larger/equal): {}", path_to_utf8(relative));
+                            }
+
+                            auto token = tracker.begin_file(file);
+
+                            auto ext = file.extension().string();
+                            std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });
+
+                            ProcessResult res;
+                            if (ext_matches(video_exts, ext))
+                                res = video_proc.compress(file, output);
+                            else
+                                res = image_proc.compress(file, output);
+
+                            tracker.finish_file(token, output, res.success, res.message);
+
+                            {
+                                std::lock_guard lock(state_mutex);
+                                if (res.success) retry_log.mark_completed(file);
+                                else retry_log.mark_failed(file);
+                                retry_log.save();
+                            }
                         }
-
-                        auto token = tracker.begin_file(file);
-
-                        // Lowercase extension and use the supported types lists
-                        auto ext = file.extension().string();
-                        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });
-
-                        ProcessResult res;
-                        if (ext_matches(video_exts, ext))
-                            res = video_proc.compress(file, output);
-                        else
-                            res = image_proc.compress(file, output);
-
-                        tracker.finish_file(token, output, res.success, res.message);
-
-                    // Save state after every file
-                        {
+                        catch (const std::exception& e) {
+                            logger->error("[THREAD] Exception on {}: {}", path_to_utf8(file), e.what());
                             std::lock_guard lock(state_mutex);
-
-                            if (res.success) retry_log.mark_completed(file);
-                            else retry_log.mark_failed(file);
-
+                            retry_log.mark_failed(file);
+                            retry_log.save();
+                        }
+                        catch (...) {
+                            logger->error("[THREAD] Unknown exception on {}", path_to_utf8(file));
+                            std::lock_guard lock(state_mutex);
+                            retry_log.mark_failed(file);
                             retry_log.save();
                         }
                     }
-                    catch (const std::exception& e) {
-                        logger->error("[THREAD] Exception on {}: {}", file.string(), e.what());
-                    }
-                    catch (...) {
-                        logger->error("[THREAD] Unknown exception on {}", file.string());
-                    }
+                }
+                catch (const std::exception& e) {
+                    logger->error("[THREAD] Fatal exception (thread exiting): {}", e.what());
+                }
+                catch (...) {
+                    logger->error("[THREAD] Fatal unknown exception (thread exiting)");
                 }
 
-                finished.count_down(); // Signal this worker has finished.
+                finished.count_down();
             };
 
-        // Launch all worker threads. std::jthread auto-joins on destruction, but we wait on the latch below so all work is done before we return.
         std::vector<std::jthread> threads;
         threads.reserve(num_threads);
         for (unsigned int i = 0; i < num_threads; ++i) {
-            threads.emplace_back(worker);
+            try {
+                threads.emplace_back(worker);
+            }
+            catch (const std::exception& e) {
+                logger->error("Failed to create thread {}: {}", i, e.what());
+                // If thread creation fails, decrement latch so finished.wait() won't block forever.
+                finished.count_down();
+            }
         }
 
-        // Signal workers that the queue is fully populated and no new items will arrive.
-        // Must be done under the lock so workers cannot miss the notification between checking the predicate and going to sleep.
         {
             std::lock_guard<std::mutex> lock(queue_mutex);
             done = true;
         }
         cv.notify_all();
 
-        // Block until every worker has called count_down().
         finished.wait();
 
         tracker.print_summary();

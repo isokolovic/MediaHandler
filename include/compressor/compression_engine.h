@@ -1,9 +1,12 @@
 #pragma once
 #include "utils/config.h"
+#include "utils/utils.h"
 #include <filesystem>
 #include <vector>
 #include <array>
 #include <string>
+#include <memory>
+#include <spdlog/spdlog.h>
 
 namespace media_handler::compressor {
 
@@ -15,7 +18,7 @@ namespace media_handler::compressor {
 
     class CompressionEngine {
     public:
-		explicit CompressionEngine(const utils::Config& cfg); // No implicit conversions
+        explicit CompressionEngine(const utils::Config& cfg); // No implicit conversions
 
         /// @brief Scan directory for supported media files
         std::vector<std::filesystem::path> scan_media_files(const std::filesystem::path& input_dir) const;
