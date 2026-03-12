@@ -25,6 +25,11 @@ namespace media_handler::compressor {
         longjmp(err->setjmp_buffer, 1);
     }
 
+    // Suppresses libjpeg trace spam that would otherwise go to stderr
+    static void jpeg_emit_message_safe(j_common_ptr /*cinfo*/, int /*msg_level*/) {
+        // Intentionally suppressed. Fatal errors are handled by jpeg_error_exit_safe.
+    }
+
     ImageProcessor::ImageProcessor(const utils::Config& cfg, std::shared_ptr<spdlog::logger> logger)
         : config(cfg), logger(std::move(logger)) { //std::move() to avoid ref-count increment
     }
@@ -69,6 +74,7 @@ namespace media_handler::compressor {
         // Safe error handler so libjpeg never calls exit().
         srcinfo.err = jpeg_std_error(&jerr.pub);
         jerr.pub.error_exit = jpeg_error_exit_safe;
+        jerr.pub.emit_message = jpeg_emit_message_safe; //suppress stderr trace/warning spam
 
         if (setjmp(jerr.setjmp_buffer)) {
             jpeg_destroy_decompress(&srcinfo);
@@ -90,6 +96,8 @@ namespace media_handler::compressor {
 
         jpeg_start_decompress(&srcinfo);
         dstinfo.err = jpeg_std_error(&jerr.pub); //share the same handler
+        dstinfo.err->error_exit = jpeg_error_exit_safe;
+        dstinfo.err->emit_message = jpeg_emit_message_safe; //suppress stderr trace/warning spam
         jpeg_create_compress(&dstinfo);
         jpeg_stdio_dest(&dstinfo, outfile);
 
@@ -215,6 +223,7 @@ namespace media_handler::compressor {
 
         cinfo.err = jpeg_std_error(&jerr.pub);
         jerr.pub.error_exit = jpeg_error_exit_safe;
+        jerr.pub.emit_message = jpeg_emit_message_safe; //suppress stderr trace/warning spam
 
         if (setjmp(jerr.setjmp_buffer)) {
             jpeg_destroy_compress(&cinfo);
