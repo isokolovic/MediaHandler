@@ -32,11 +32,14 @@ namespace media_handler::utils {
 
         auto now = std::chrono::steady_clock::now();
 
+        const bool is_skipped = success && !error.empty();
+
         {
             std::lock_guard lock(mutex);
             auto& s = stats[token];
             s.elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_times[token]);
             s.success = success;
+            s.skipped = is_skipped;
             s.error = error;
 
             if (success) {
@@ -45,7 +48,13 @@ namespace media_handler::utils {
             }
         }
 
-        if (success) {
+        if (is_skipped) {
+            auto pos = completed.load() + failed.load() + ++skipped;
+            std::lock_guard lock(mutex);
+            const auto& s = stats[token];
+            logger->info("[{}/{}] SKIP {} | {}", pos, total, s.filename, error);
+        }
+        else if (success) {
             auto pos = ++completed + failed.load() + skipped.load();
 
             std::lock_guard lock(mutex);
