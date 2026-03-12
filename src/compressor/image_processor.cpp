@@ -3,6 +3,7 @@
 #include <fstream>
 #include <algorithm>
 #include <cctype>
+#include <vector>
 #include <jpeglib.h>
 #include <libexif/exif-data.h>
 #include <png.h>
@@ -118,19 +119,14 @@ namespace media_handler::compressor {
         unsigned char header[12] = { 0 };
         size_t r = fread(header, 1, sizeof(header), f);
         fclose(f);
-
         // Bytes 4-7 must always be "ftyp". Bytes 8-11 are the brand code.
         // Check them separately so we can do a case-insensitive brand comparison.
         if (r < 12 || memcmp(&header[4], "ftyp", 4) != 0) {
             return ProcessResult::Error("Not a HEIC/HEIF file (missing ftyp box)");
         }
-
         char brand[5] = {};
-
-        for (int i = 0; i < 4; ++i) {
+        for (int i = 0; i < 4; ++i)
             brand[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(header[8 + i])));
-        }
-
         if (memcmp(brand, "heic", 4) != 0 && // standard HEIC (iPhone)
             memcmp(brand, "heix", 4) != 0 && // HEIC with extended HDR
             memcmp(brand, "heif", 4) != 0 && // HEIF image sequence
@@ -205,6 +201,29 @@ namespace media_handler::compressor {
         jpeg_set_defaults(&cinfo);
         jpeg_set_quality(&cinfo, PHOTO_QUALITY, TRUE);
         jpeg_start_compress(&cinfo, TRUE);
+
+        // Preserve EXIF metadata from the HEIC source.
+        {
+            int meta_count = heif_image_handle_get_number_of_metadata_blocks(handle, "Exif");
+            if (meta_count > 0) {
+                heif_item_id meta_id = 0;
+                heif_image_handle_get_list_of_metadata_block_IDs(handle, "Exif", &meta_id, 1);
+
+                size_t meta_size = heif_image_handle_get_metadata_size(handle, meta_id);
+                if (meta_size > 10) {
+                    std::vector<uint8_t> meta_buf(meta_size);
+
+                    heif_error meta_err = heif_image_handle_get_metadata(handle, meta_id, meta_buf.data());
+                    if (meta_err.code == heif_error_Ok) {
+                        const uint8_t* exif_ptr = meta_buf.data() + 4;
+                        size_t exif_size = meta_size - 4;
+                        if (memcmp(exif_ptr, "Exif\0\0", 6) == 0) {
+                            jpeg_write_marker(&cinfo, JPEG_APP0 + 1, exif_ptr, static_cast<unsigned int>(exif_size));
+                        }
+                    }
+                }
+            }
+        }
 
         // Write scanlines
         JSAMPROW row_pointer[1];
