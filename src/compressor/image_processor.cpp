@@ -118,8 +118,26 @@ namespace media_handler::compressor {
         unsigned char header[12] = { 0 };
         size_t r = fread(header, 1, sizeof(header), f);
         fclose(f);
-        if (r < 12 || memcmp(&header[4], "ftypheic", 8) != 0) {
-            return ProcessResult::Error("Not a HEIC file (signature mismatch)");
+
+        // Bytes 4-7 must always be "ftyp". Bytes 8-11 are the brand code.
+        // Check them separately so we can do a case-insensitive brand comparison.
+        if (r < 12 || memcmp(&header[4], "ftyp", 4) != 0) {
+            return ProcessResult::Error("Not a HEIC/HEIF file (missing ftyp box)");
+        }
+
+        char brand[5] = {};
+
+        for (int i = 0; i < 4; ++i) {
+            brand[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(header[8 + i])));
+        }
+
+        if (memcmp(brand, "heic", 4) != 0 && // standard HEIC (iPhone)
+            memcmp(brand, "heix", 4) != 0 && // HEIC with extended HDR
+            memcmp(brand, "heif", 4) != 0 && // HEIF image sequence
+            memcmp(brand, "mif1", 4) != 0 && // generic multi-image
+            memcmp(brand, "msf1", 4) != 0) // generic multi-image sequence
+        {
+            return ProcessResult::Error("Not a HEIC/HEIF file (unsupported brand)");
         }
 
         heif_context* ctx = heif_context_alloc();
