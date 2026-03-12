@@ -13,7 +13,7 @@ namespace media_handler::compressor {
     namespace fs = std::filesystem;
 
     ImageProcessor::ImageProcessor(const utils::Config& cfg, std::shared_ptr<spdlog::logger> logger)
-		: config(cfg), logger(std::move(logger)) { //std::move() to avoid ref-count increment
+        : config(cfg), logger(std::move(logger)) { //std::move() to avoid ref-count increment
     }
 
     static bool file_exists_and_readable(const fs::path& path) {
@@ -298,9 +298,12 @@ namespace media_handler::compressor {
         png_destroy_read_struct(&png_read_ptr, &read_info_ptr, NULL);
         fclose(in_file);
 
-        // Resize output dimensions
-        png_uint_32 out_width = width > PHOTO_TRIM_WIDTH ? PHOTO_TRIM_WIDTH : width;
-        png_uint_32 out_height = height > PHOTO_TRIM_HEIGHT ? PHOTO_TRIM_HEIGHT : height;
+        // Resize output dimensions while preserving aspect ratio.
+        double scale = 1.0;
+        if (width > PHOTO_TRIM_WIDTH) scale = std::min(scale, static_cast<double>(PHOTO_TRIM_WIDTH) / width);
+        if (height > PHOTO_TRIM_HEIGHT) scale = std::min(scale, static_cast<double>(PHOTO_TRIM_HEIGHT) / height);
+        png_uint_32 out_width = static_cast<png_uint_32>(width * scale);
+        png_uint_32 out_height = static_cast<png_uint_32>(height * scale);
 
         out_file = utils::fopen_path(output, "wb");
         if (!out_file) {
