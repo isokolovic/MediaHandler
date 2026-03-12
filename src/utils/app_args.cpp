@@ -11,7 +11,7 @@ namespace media_handler::utils {
         auto config_file = PathUtils::find_config_file();
 
         if (config_file.empty()) {
-            logger->warn("No config.json found — using defaults");
+            logger->warn("No config.json found - using defaults");
         }
         else {
             logger->info("Found config at: {}", config_file.string());
@@ -19,12 +19,12 @@ namespace media_handler::utils {
                 args.cfg = std::move(*result);
             }
             else {
-                logger->warn("Config load error: {} — using defaults", result.error());
+                logger->warn("Config load error: {} - using defaults", result.error());
             }
         }
 
         // 2. Parse CLI and override JSON values if provided
-        CLI::App app{ "Media Handler — High-performance media converter" };
+        CLI::App app{ "Media Handler - High-performance media converter" };
 
 		// Direct binding to args and args.cfg. Overwritten only if input flag is present
         app.add_option("-i,--input", args.inputs, "Input file(s)/directory");
@@ -52,7 +52,7 @@ namespace media_handler::utils {
             // Validate final cfg after overrides
             auto val = args.cfg.validate();
             if (!val) {
-                logger->warn("Invalid final config: {} — using defaults", val.error());
+                logger->warn("Invalid final config: {} - using defaults", val.error());
                 args.cfg = Config(); // Reset to full defaults if invalid
             }
         }

@@ -24,7 +24,7 @@ namespace media_handler::compressor {
         ProcessResult compress(const std::filesystem::path& input, const std::filesystem::path& output);
 
     private:
-        const utils::Config& config;
+        const utils::Config config;
         std::shared_ptr<spdlog::logger> logger;
 
         /// @brief Verify file exists and is readable
