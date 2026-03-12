@@ -13,6 +13,18 @@ namespace media_handler::compressor {
 
     namespace fs = std::filesystem;
 
+    struct JpegErrorHandler {
+        struct jpeg_error_mgr pub; // must be first member
+        jmp_buf setjmp_buffer;
+        char message[JMSG_LENGTH_MAX];
+    };
+
+    static void jpeg_error_exit_safe(j_common_ptr cinfo) {
+        auto* err = reinterpret_cast<JpegErrorHandler*>(cinfo->err);
+        (*cinfo->err->format_message)(cinfo, err->message);
+        longjmp(err->setjmp_buffer, 1);
+    }
+
     ImageProcessor::ImageProcessor(const utils::Config& cfg, std::shared_ptr<spdlog::logger> logger)
         : config(cfg), logger(std::move(logger)) { //std::move() to avoid ref-count increment
     }
@@ -52,9 +64,21 @@ namespace media_handler::compressor {
 
         struct jpeg_decompress_struct srcinfo;
         struct jpeg_compress_struct dstinfo;
-        struct jpeg_error_mgr jerr;
+        JpegErrorHandler jerr;
 
-        srcinfo.err = jpeg_std_error(&jerr);
+        // Safe error handler so libjpeg never calls exit().
+        srcinfo.err = jpeg_std_error(&jerr.pub);
+        jerr.pub.error_exit = jpeg_error_exit_safe;
+
+        if (setjmp(jerr.setjmp_buffer)) {
+            jpeg_destroy_decompress(&srcinfo);
+            jpeg_destroy_compress(&dstinfo);
+            fclose(infile);
+            fclose(outfile);
+
+            return ProcessResult::Error(std::format("libjpeg error (decompress): {}", jerr.message));
+        }
+
         jpeg_create_decompress(&srcinfo);
         jpeg_stdio_src(&srcinfo, infile);
         if (jpeg_read_header(&srcinfo, TRUE) != JPEG_HEADER_OK) {
@@ -65,7 +89,7 @@ namespace media_handler::compressor {
         }
 
         jpeg_start_decompress(&srcinfo);
-        dstinfo.err = jpeg_std_error(&jerr);
+        dstinfo.err = jpeg_std_error(&jerr.pub); //share the same handler
         jpeg_create_compress(&dstinfo);
         jpeg_stdio_dest(&dstinfo, outfile);
 
@@ -187,9 +211,21 @@ namespace media_handler::compressor {
 
         // Initialize JPEG compression
         struct jpeg_compress_struct cinfo;
-        struct jpeg_error_mgr jerr;
+        JpegErrorHandler jerr;
 
-        cinfo.err = jpeg_std_error(&jerr);
+        cinfo.err = jpeg_std_error(&jerr.pub);
+        jerr.pub.error_exit = jpeg_error_exit_safe;
+
+        if (setjmp(jerr.setjmp_buffer)) {
+            jpeg_destroy_compress(&cinfo);
+            fclose(outfile);
+            heif_image_release(image);
+            heif_image_handle_release(handle);
+            heif_context_free(ctx);
+
+            return ProcessResult::Error(std::format("libjpeg error (heic encode): {}", jerr.message));
+        }
+
         jpeg_create_compress(&cinfo);
         jpeg_stdio_dest(&cinfo, outfile);
 
@@ -208,11 +244,9 @@ namespace media_handler::compressor {
             if (meta_count > 0) {
                 heif_item_id meta_id = 0;
                 heif_image_handle_get_list_of_metadata_block_IDs(handle, "Exif", &meta_id, 1);
-
                 size_t meta_size = heif_image_handle_get_metadata_size(handle, meta_id);
                 if (meta_size > 10) {
                     std::vector<uint8_t> meta_buf(meta_size);
-
                     heif_error meta_err = heif_image_handle_get_metadata(handle, meta_id, meta_buf.data());
                     if (meta_err.code == heif_error_Ok) {
                         const uint8_t* exif_ptr = meta_buf.data() + 4;

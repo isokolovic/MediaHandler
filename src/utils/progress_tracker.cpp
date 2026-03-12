@@ -1,4 +1,5 @@
 #include "utils/progress_tracker.h"
+#include "utils/utils.h"
 #include <format>
 
 namespace media_handler::utils {
@@ -17,7 +18,7 @@ namespace media_handler::utils {
     std::size_t ProgressTracker::begin_file(const fs::path& file) {
         std::lock_guard lock(mutex);
         FileStats s;
-        s.filename = file.filename().string();
+        s.filename = path_to_utf8(file.filename());
         std::error_code ec;
         s.size_in = fs::file_size(file, ec);
 
@@ -78,7 +79,7 @@ namespace media_handler::utils {
     void ProgressTracker::skip_file(const fs::path& file) {
         auto pos = completed.load() + failed.load() + ++skipped;
 
-        logger->debug("[{}/{}] SKIP {} (already completed)", pos, total, file.filename().string());
+        logger->debug("[{}/{}] SKIP {} (already completed)", pos, total, path_to_utf8(file.filename()));
     }
 
     void ProgressTracker::print_summary() const {
